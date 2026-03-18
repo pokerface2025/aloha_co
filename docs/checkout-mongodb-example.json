@@ -1,0 +1,141 @@
+{
+  "formAnalysis": {
+    "capturedFields": {
+      "email": "Se usa para contacto y pago",
+      "phone": "Se usa para contacto del pedido",
+      "firstName": "Se usa para construir customer.name",
+      "lastName": "Se usa para construir customer.name",
+      "address": "Se usa como customer.addressLine",
+      "apartment": "Se guarda dentro de customer.notes",
+      "city": "Se usa como customer.city",
+      "department": "Se guarda como customer.neighborhood",
+      "postalCode": "Se guarda dentro de customer.notes",
+      "saveInfo": "Se captura en UI, pero hoy no se envia al backend",
+      "shippingMethod": "Existe en estado, pero hoy no cambia ni se envia",
+      "cardNumber": "Existe en estado, pero no se usa porque el pago redirige a Bold",
+      "cardName": "Existe en estado, pero no se usa porque el pago redirige a Bold",
+      "expiryDate": "Existe en estado, pero no se usa porque el pago redirige a Bold",
+      "cvv": "Existe en estado, pero no se usa porque el pago redirige a Bold",
+      "deedName": "Obligatorio. Se guarda dentro de customer.notes"
+    },
+    "currentlySentToPaymentProvider": {
+      "totalAmount": "totalDueNow",
+      "description": "Texto fijo",
+      "email": "formData.email",
+      "callbackUrl": "https://google.com",
+      "imgUrl": "Vacio",
+      "orderReference": "Referencia generada"
+    }
+  },
+  "frontendFormExample": {
+    "email": "maria.gomez@example.com",
+    "phone": "+57 300 123 4567",
+    "firstName": "Maria",
+    "lastName": "Gomez",
+    "address": "Calle 84 #52-31",
+    "apartment": "Apto 402",
+    "city": "Barranquilla",
+    "department": "Atlantico",
+    "postalCode": "080001",
+    "saveInfo": true,
+    "shippingMethod": "standard",
+    "cardNumber": "",
+    "cardName": "",
+    "expiryDate": "",
+    "cvv": "",
+    "deedName": "Maria Gomez"
+  },
+  "backendPayloadExample": {
+    "orderReference": "ALOHA-20260313-A1B2",
+    "customer": {
+      "firstName": "Maria",
+      "lastName": "Gomez",
+      "fullName": "Maria Gomez",
+      "email": "maria.gomez@example.com",
+      "phone": "+57 300 123 4567",
+      "address": {
+        "street": "Calle 84 #52-31",
+        "apartment": "Apto 402",
+        "city": "Barranquilla",
+        "department": "Atlantico",
+        "postalCode": "080001",
+        "country": "CO"
+      }
+    },
+    "fulfillment": {
+      "shippingMethod": "standard",
+      "shippingMode": "free",
+      "shippingCost": 0,
+      "shippingNote": "Envio gratis"
+    },
+    "digitalOwnership": {
+      "deedName": "Maria Gomez"
+    },
+    "items": [
+      {
+        "productId": "classic-white-tee",
+        "variantSku": "classic-white-tee-m-white",
+        "size": "M",
+        "color": "White",
+        "quantity": 2,
+        "unitPrice": 55000,
+        "lineTotal": 110000
+      },
+      {
+        "productId": "ocean-breeze-tee",
+        "variantSku": "ocean-breeze-tee-l-blue",
+        "size": "L",
+        "color": "Blue",
+        "quantity": 1,
+        "unitPrice": 55000,
+        "lineTotal": 55000
+      }
+    ],
+    "pricing": {
+      "productsSubtotal": 165000,
+      "shippingCost": 0,
+      "totalDueNow": 165000,
+      "currency": "COP"
+    },
+    "payment": {
+      "provider": "bold",
+      "status": "pending_payment"
+    },
+    "metadata": {
+      "saveInfo": true,
+      "source": "checkout-web",
+      "createdAt": "2026-03-13T18:30:00.000Z"
+    }
+  },
+  "currentAppOrderRecordExample": {
+    "orderReference": "ALOHA-20260313-A1B2",
+    "customer": {
+      "name": "Maria Gomez",
+      "email": "maria.gomez@example.com",
+      "phone": "+57 300 123 4567",
+      "city": "Barranquilla",
+      "neighborhood": "Atlantico",
+      "addressLine": "Calle 84 #52-31",
+      "notes": "Titulo de Propiedad Digital: Maria Gomez | Apto 402 | 080001"
+    },
+    "items": [
+      {
+        "productId": "classic-white-tee",
+        "variantSku": "classic-white-tee-m-white",
+        "quantity": 2
+      },
+      {
+        "productId": "ocean-breeze-tee",
+        "variantSku": "ocean-breeze-tee-l-blue",
+        "quantity": 1
+      }
+    ],
+    "productsSubtotal": 165000,
+    "shippingCost": 0,
+    "shippingMode": "free",
+    "shippingNote": "Envio gratis",
+    "totalDueNow": 165000,
+    "status": "pending_payment",
+    "createdAt": "2026-03-13T18:30:00.000Z"
+  }
+}
