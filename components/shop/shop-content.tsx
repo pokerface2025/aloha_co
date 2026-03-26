@@ -1,11 +1,11 @@
 'use client'
 
-import { startTransition, type ReactNode, useEffect, useMemo, useState } from 'react'
+import { startTransition, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion'
-import { ArrowRight, Heart, RotateCcw, Shield, ShoppingBag, Sparkles, X } from 'lucide-react'
+import { ArrowRight, Heart, RotateCcw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useCartStore } from '@/lib/store'
 import { formatPrice, products } from '@/lib/products'
@@ -17,6 +17,13 @@ import { COLLECTIONS, type CollectionId } from '@/lib/constants'
 type ShopView = 'quest' | 'collections'
 type QuestStage = 'intro' | 'browse' | 'result'
 type QuestReaction = 'like' | 'pass'
+type StyleProfile = 'hombre' | 'mujer'
+type FavoriteSelectionConfig = {
+  selected: boolean
+  color: string
+  size: Size | null
+  quantity: number
+}
 
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: 'newest', label: 'Más nuevas' },
@@ -36,6 +43,7 @@ const collectionPills = [
 const headingFont = '[font-family:var(--font-shop-heading)]'
 const bodyFont = '[font-family:var(--font-shop-body)]'
 const monoFont = '[font-family:var(--font-shop-mono)]'
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
 export function ShopContent() {
   const { audience } = useTheme()
@@ -55,10 +63,14 @@ export function ShopContent() {
 
   const [view, setView] = useState<ShopView>(activeViewFromQuery)
   const [stage, setStage] = useState<QuestStage>('intro')
+  const [styleProfile, setStyleProfile] = useState<StyleProfile>('hombre')
   const [sortBy, setSortBy] = useState<SortOption>(sortParam || 'newest')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [swipeDirection, setSwipeDirection] = useState(1)
+  const [dragOffset, setDragOffset] = useState(0)
   const [likedProducts, setLikedProducts] = useState<Array<{ product: Product; score: number }>>([])
+  const [favoriteSelections, setFavoriteSelections] = useState<Record<string, FavoriteSelectionConfig>>({})
+  const [selectedResultProductId, setSelectedResultProductId] = useState('')
   const [selectedColor, setSelectedColor] = useState('')
   const [selectedSize, setSelectedSize] = useState<Size | null>(null)
   const [checkoutMessage, setCheckoutMessage] = useState('')
@@ -97,14 +109,39 @@ export function ShopContent() {
     return filtered
   }, [activeCollection, audience, filterParam, sortBy])
 
-  const currentProduct = filteredProducts[currentIndex] || null
-  const topMatch = useMemo(() => {
+  const questProducts = useMemo(() => {
+    return [...filteredProducts]
+      .sort((left, right) => {
+        return (
+          getQuestScore(right, filteredProducts.length, 0, styleProfile) -
+          getQuestScore(left, filteredProducts.length, 0, styleProfile)
+        )
+      })
+      .slice(0, 5)
+  }, [filteredProducts, styleProfile])
+
+  const currentProduct = questProducts[currentIndex] || null
+
+  const resultCandidates = useMemo(() => {
     if (likedProducts.length > 0) {
-      return [...likedProducts].sort((left, right) => right.score - left.score)[0]?.product ?? null
+      const uniqueProducts = new Map<string, { product: Product; score: number }>()
+
+      likedProducts
+        .sort((left, right) => right.score - left.score)
+        .forEach((entry) => {
+          if (!uniqueProducts.has(entry.product.id)) {
+            uniqueProducts.set(entry.product.id, entry)
+          }
+        })
+
+      return Array.from(uniqueProducts.values()).map((entry) => entry.product)
     }
 
-    return filteredProducts[0] ?? null
-  }, [filteredProducts, likedProducts])
+    return questProducts.slice(0, 3)
+  }, [likedProducts, questProducts])
+
+  const activeResultProduct =
+    resultCandidates.find((product) => product.id === selectedResultProductId) || resultCandidates[0] || null
 
   const activeCollectionLabel =
     collectionPills.find((collection) => collection.id === activeCollection)?.label || 'Todos los capítulos'
@@ -124,18 +161,18 @@ export function ShopContent() {
   }, [activeCollection, collections, filteredProducts])
 
   const resultColors = useMemo(
-    () => (topMatch ? getProductColors(topMatch) : []),
-    [topMatch],
+    () => (activeResultProduct ? getProductColors(activeResultProduct) : []),
+    [activeResultProduct],
   )
 
   const availableSizes = useMemo(
-    () => (topMatch ? getAvailableSizes(topMatch, selectedColor) : []),
-    [selectedColor, topMatch],
+    () => (activeResultProduct ? getAvailableSizes(activeResultProduct, selectedColor) : []),
+    [activeResultProduct, selectedColor],
   )
 
   const selectedVariant =
-    topMatch && selectedSize
-      ? topMatch.variants.find(
+    activeResultProduct && selectedSize
+      ? activeResultProduct.variants.find(
           (variant) => variant.color === selectedColor && variant.size === selectedSize && variant.stock > 0,
         ) || null
       : null
@@ -202,50 +239,119 @@ export function ShopContent() {
 
   useEffect(() => {
     setStage('intro')
+    setStyleProfile('hombre')
     setCurrentIndex(0)
     setSwipeDirection(1)
+    setDragOffset(0)
     setLikedProducts([])
+    setFavoriteSelections({})
+    setSelectedResultProductId('')
     setCheckoutMessage('')
     setIsPreparingCheckout(false)
   }, [activeCollection, audience, filterParam, sortBy])
 
   useEffect(() => {
-    if (!topMatch) {
+    if (!activeResultProduct) {
       setSelectedColor('')
       setSelectedSize(null)
       return
     }
 
-    const colors = getProductColors(topMatch)
+    const colors = getProductColors(activeResultProduct)
     setSelectedColor((previousColor) =>
       colors.some((color) => color.color === previousColor) ? previousColor : colors[0]?.color || '',
     )
-  }, [topMatch])
+  }, [activeResultProduct])
 
   useEffect(() => {
-    if (!topMatch || !selectedColor) {
+    if (!activeResultProduct || !selectedColor) {
       setSelectedSize(null)
       return
     }
 
-    const sizes = getAvailableSizes(topMatch, selectedColor)
+    const sizes = getAvailableSizes(activeResultProduct, selectedColor)
     setSelectedSize((previousSize) => (previousSize && sizes.includes(previousSize) ? previousSize : sizes[0] || null))
-  }, [selectedColor, topMatch])
+  }, [activeResultProduct, selectedColor])
+
+  useEffect(() => {
+    if (resultCandidates.length === 0) {
+      setSelectedResultProductId('')
+      return
+    }
+
+    setSelectedResultProductId((previousId) =>
+      resultCandidates.some((product) => product.id === previousId) ? previousId : resultCandidates[0]?.id || '',
+    )
+  }, [resultCandidates])
+
+  useEffect(() => {
+    setFavoriteSelections((previousSelections) => {
+      const nextSelections = Object.fromEntries(
+        resultCandidates.map((product, index) => {
+          const previousConfig = previousSelections[product.id]
+          const colors = getProductColors(product)
+          const nextColor =
+            previousConfig && colors.some((color) => color.color === previousConfig.color)
+              ? previousConfig.color
+              : colors[0]?.color || ''
+          const sizes = getAvailableSizes(product, nextColor)
+          const nextSize =
+            previousConfig?.size && sizes.includes(previousConfig.size)
+              ? previousConfig.size
+              : sizes[0] || null
+
+          return [
+            product.id,
+            {
+              selected: previousConfig?.selected ?? (likedProducts.length > 0 ? true : index === 0),
+              color: nextColor,
+              size: nextSize,
+              quantity: previousConfig?.quantity ?? 1,
+            },
+          ]
+        }),
+      )
+
+      return nextSelections
+    })
+  }, [likedProducts.length, resultCandidates])
 
   const beginQuest = () => {
+    setStage('browse')
     setCheckoutMessage('')
     setIsPreparingCheckout(false)
     setCurrentIndex(0)
     setLikedProducts([])
+    setFavoriteSelections({})
+    setSelectedResultProductId('')
     setSwipeDirection(1)
+    setDragOffset(0)
+  }
+
+  const startGuidedSelection = (nextProfile?: StyleProfile) => {
+    if (nextProfile) {
+      setStyleProfile(nextProfile)
+    }
+    setCheckoutMessage('')
+    setIsPreparingCheckout(false)
+    setCurrentIndex(0)
+    setLikedProducts([])
+    setFavoriteSelections({})
+    setSelectedResultProductId('')
+    setSwipeDirection(1)
+    setDragOffset(0)
     setStage('browse')
   }
 
   const resetQuest = () => {
     setStage('intro')
+    setStyleProfile('hombre')
     setCurrentIndex(0)
     setLikedProducts([])
+    setFavoriteSelections({})
+    setSelectedResultProductId('')
     setSwipeDirection(1)
+    setDragOffset(0)
     setCheckoutMessage('')
     setIsPreparingCheckout(false)
   }
@@ -290,18 +396,19 @@ export function ShopContent() {
 
     setCheckoutMessage('')
     setSwipeDirection(reaction === 'like' ? 1 : -1)
+    setDragOffset(0)
 
     if (reaction === 'like') {
       setLikedProducts((previousLikes) => [
         ...previousLikes,
         {
           product: currentProduct,
-          score: getQuestScore(currentProduct, filteredProducts.length, previousLikes.length),
+          score: getQuestScore(currentProduct, questProducts.length, previousLikes.length, styleProfile),
         },
       ])
     }
 
-    if (currentIndex >= filteredProducts.length - 1) {
+    if (currentIndex >= questProducts.length - 1) {
       setStage('result')
       return
     }
@@ -310,6 +417,8 @@ export function ShopContent() {
   }
 
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    setDragOffset(0)
+
     if (info.offset.x > 120) {
       handleReaction('like')
       return
@@ -321,7 +430,7 @@ export function ShopContent() {
   }
 
   const handleCheckout = () => {
-    if (!topMatch || !selectedVariant) {
+    if (!activeResultProduct || !selectedVariant) {
       setCheckoutMessage('Selecciona una talla disponible antes de continuar.')
       return
     }
@@ -332,7 +441,7 @@ export function ShopContent() {
 
     if (!existingItem) {
       addItem({
-        productId: topMatch.id,
+        productId: activeResultProduct.id,
         variantSku: selectedVariant.sku,
         size: selectedVariant.size,
         color: selectedVariant.color,
@@ -341,6 +450,97 @@ export function ShopContent() {
     }
 
     router.push('/checkout')
+  }
+
+  const updateFavoriteSelection = (
+    productId: string,
+    updater: (current: FavoriteSelectionConfig) => FavoriteSelectionConfig,
+  ) => {
+    setFavoriteSelections((previousSelections) => {
+      const currentSelection = previousSelections[productId]
+      if (!currentSelection) return previousSelections
+
+      return {
+        ...previousSelections,
+        [productId]: updater(currentSelection),
+      }
+    })
+  }
+
+  const applySizeToSelectedFavorites = (size: Size) => {
+    setFavoriteSelections((previousSelections) => {
+      const nextSelections = { ...previousSelections }
+
+      resultCandidates.forEach((product) => {
+        const currentSelection = previousSelections[product.id]
+        if (!currentSelection?.selected) return
+
+        const sizes = getAvailableSizes(product, currentSelection.color)
+        if (!sizes.includes(size)) return
+
+        nextSelections[product.id] = {
+          ...currentSelection,
+          size,
+        }
+      })
+
+      return nextSelections
+    })
+  }
+
+  const handleAddSelectedToCart = () => {
+    const selectedProducts = resultCandidates
+      .map((product) => ({
+        product,
+        config: favoriteSelections[product.id],
+      }))
+      .filter((entry) => entry.config?.selected)
+
+    if (selectedProducts.length === 0) {
+      setCheckoutMessage('Selecciona al menos una prenda para llevarla al carrito.')
+      return
+    }
+
+    const preparedItems = selectedProducts.map(({ product, config }) => {
+      const variant =
+        config?.size
+          ? product.variants.find(
+              (item) =>
+                item.color === config.color &&
+                item.size === config.size &&
+                item.stock > 0,
+            ) || null
+          : null
+
+      return {
+        product,
+        config,
+        variant,
+      }
+    })
+
+    if (preparedItems.some((entry) => !entry.config?.size || !entry.variant)) {
+      setCheckoutMessage('Revisa talla y color en cada favorita antes de continuar.')
+      return
+    }
+
+    setCheckoutMessage('')
+    setIsPreparingCheckout(true)
+
+    preparedItems.forEach(({ product, config, variant }) => {
+      if (!config || !variant) return
+
+      addItem({
+        productId: product.id,
+        variantSku: variant.sku,
+        size: variant.size,
+        color: variant.color,
+        colorHex: variant.colorHex,
+        quantity: config.quantity,
+      })
+    })
+
+    router.push('/cart')
   }
 
   if (filteredProducts.length === 0) {
@@ -368,6 +568,33 @@ export function ShopContent() {
     )
   }
 
+  const likeActive = dragOffset > 56
+  const passActive = dragOffset < -56
+  const selectedFavoriteEntries = resultCandidates
+    .map((product) => {
+      const config = favoriteSelections[product.id]
+      const variant =
+        config?.size
+          ? product.variants.find(
+              (item) =>
+                item.color === config.color &&
+                item.size === config.size &&
+                item.stock > 0,
+            ) || null
+          : null
+
+      return { product, config, variant }
+    })
+    .filter((entry) => entry.config?.selected)
+  const selectedFavoriteCount = selectedFavoriteEntries.reduce(
+    (total, entry) => total + (entry.config?.quantity || 0),
+    0,
+  )
+  const selectedFavoriteSubtotal = selectedFavoriteEntries.reduce(
+    (total, entry) => total + entry.product.price * (entry.config?.quantity || 0),
+    0,
+  )
+
   return (
     <section className={`relative isolate overflow-hidden ${bodyFont}`}>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[36rem] bg-[radial-gradient(circle_at_top,rgba(140,185,216,0.24),transparent_52%)]" />
@@ -378,19 +605,15 @@ export function ShopContent() {
           <div className="flex flex-col gap-5 border-b border-[#8CB9D8]/12 pb-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
               <span className={`text-[11px] uppercase tracking-[0.38em] text-[#6B98B8] ${monoFont}`}>
-                {view === 'collections' ? 'Selecciones Curadas' : 'El Proceso de Selección'}
+                Archivo editorial
               </span>
               <h1 className={`mt-4 text-4xl leading-none text-[#335A77] sm:text-5xl lg:text-6xl ${headingFont}`}>
-                {view === 'collections'
-                  ? 'Colecciones'
-                  : filterParam === 'hot-sale'
-                    ? 'Selección en oferta.'
-                    : 'El Proceso de Selección'}
+                Colecciones
               </h1>
               <p className="mt-4 max-w-xl text-sm leading-7 text-[#5E7A93] sm:text-base">
                 {view === 'collections'
-                  ? 'Recorre todas las colecciones con una lectura editorial, imágenes en gris que cobran color al pasar y acceso directo al checkout actual desde cada pieza.'
-                  : 'Recorre una pieza a la vez, guarda la que más te conecte y termina en el proceso de compra existente sin tocar la lógica de pago.'}
+                  ? 'Recorre el archivo visual de ALOHA con imágenes limpias que revelan cada detalle solo cuando te acercas.'
+                  : 'Te recomendamos tu próxima prenda en un recorrido simple: eliges tu ruta, deslizas cinco piezas y terminas comparando tus favoritas antes de pasar al carrito.'}
               </p>
             </div>
 
@@ -405,9 +628,9 @@ export function ShopContent() {
                   <button
                     key={option.id}
                     onClick={() => handleViewChange(option.id)}
-                    className={`min-h-11 rounded-full border px-5 py-2 text-left text-[11px] uppercase tracking-[0.26em] transition ${
+                    className={`min-h-11 rounded-full border px-6 py-2 text-left text-[11px] uppercase tracking-[0.26em] transition ${
                       isActive
-                        ? 'border-[#8CB9D8] bg-[#8CB9D8] text-[#FCFAF5]'
+                        ? 'border-[#8CB9D8] bg-[#8CB9D8] text-[#FCFAF5] shadow-[0_16px_40px_rgba(124,165,193,0.22)]'
                         : 'border-[#8CB9D8]/18 bg-transparent text-[#5E7A93] hover:border-[#8CB9D8]/45 hover:text-[#335A77]'
                     } ${monoFont}`}
                   >
@@ -421,205 +644,282 @@ export function ShopContent() {
           {view === 'collections' ? (
             <CollectionsView sections={collectionSections} />
           ) : (
-          <AnimatePresence mode="wait">
-            {stage === 'intro' ? (
-              <motion.div
-                key="intro"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center"
-              >
-                <div className="max-w-2xl py-4">
-                  <span className={`text-[11px] uppercase tracking-[0.38em] text-[#6B98B8] ${monoFont}`}>
-                    Capítulo 01
-                  </span>
-                  <h2 className={`mt-6 text-5xl leading-[0.95] text-[#335A77] sm:text-6xl ${headingFont}`}>
-                    Entra a la tienda como si fuera una portada.
-                  </h2>
-                  <p className="mt-6 max-w-xl text-base leading-8 text-[#5E7A93]">
-                    Esto no es una cuadrícula común. Es una selección tranquila, pieza por pieza, para que descubras cuál se siente realmente tuya.
-                  </p>
-                  <div className="mt-8 flex flex-wrap gap-3">
-                    <Button
-                      onClick={beginQuest}
-                      className="min-h-11 rounded-full border border-[#8CB9D8]/30 bg-[#8CB9D8] px-8 text-[#FCFAF5] hover:bg-[#7DAFCE]"
-                    >
-                      Iniciar Búsqueda
-                    </Button>
-                    <Link
-                      href={currentProduct ? `/product/${currentProduct.slug}` : '/shop'}
-                      className={`inline-flex min-h-11 items-center justify-center rounded-full border border-[#8CB9D8]/16 px-6 py-2 text-[11px] uppercase tracking-[0.32em] text-[#5E7A93] transition hover:border-[#8CB9D8]/42 hover:text-[#335A77] ${monoFont}`}
-                    >
-                      Ver ficha
-                    </Link>
+            <AnimatePresence mode="wait">
+              {stage === 'intro' ? (
+                <motion.div
+                  key="intro"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="overflow-hidden rounded-[32px] border border-[#8CB9D8]/16 bg-[rgba(252,250,245,0.72)] shadow-[0_24px_90px_rgba(124,165,193,0.12)]"
+                >
+                  <div className="grid min-h-[68vh] md:grid-cols-2">
+                    {([
+                      {
+                        id: 'hombre',
+                        title: 'Hombre',
+                        description: 'Entra por una ruta serena, directa y limpia.',
+                        image: '/hero-lifestyle.jpg',
+                        imageClassName: 'object-center',
+                      },
+                      {
+                        id: 'mujer',
+                        title: 'Mujer',
+                        description: 'Entra por una ruta suave, luminosa y con más gesto.',
+                        image: '/hero-lifestyle.jpg',
+                        imageClassName: 'scale-x-[-1] object-center',
+                      },
+                    ] as const).map((option, index) => (
+                      <button
+                        key={option.id}
+                        onClick={() => startGuidedSelection(option.id)}
+                        className={`group relative min-h-[34rem] overflow-hidden text-left ${
+                          index === 0 ? 'border-b md:border-b-0 md:border-r' : ''
+                        } border-[#8CB9D8]/16`}
+                      >
+                        <Image
+                          src={option.image}
+                          alt={`Ruta ${option.title}`}
+                          fill
+                          priority
+                          className={`object-cover grayscale transition duration-700 group-hover:scale-[1.03] group-hover:grayscale-0 ${option.imageClassName}`}
+                        />
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(246,240,230,0.02),rgba(39,74,102,0.72))]" />
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(140,185,216,0.12),transparent_42%)]" />
+                        <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8">
+                          <span className={`text-[11px] uppercase tracking-[0.38em] text-[#D9ECF8] ${monoFont}`}>
+                            Elige tu ruta
+                          </span>
+                          <h2 className={`mt-4 text-4xl text-[#FCFAF5] sm:text-5xl ${headingFont}`}>
+                            {option.title}
+                          </h2>
+                          <p className="mt-4 max-w-sm text-sm leading-7 text-[#F3F8FB]/88">
+                            {option.description}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                </div>
+                </motion.div>
+              ) : null}
 
-                <IntroPreviewCard product={filteredProducts[0]} />
-              </motion.div>
-            ) : null}
-
-            {stage === 'browse' && currentProduct ? (
-              <motion.div
-                key={`browse-${currentProduct.id}`}
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -24 }}
-                className="space-y-8"
-              >
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-2">
-                    <span className={`text-[11px] uppercase tracking-[0.36em] text-[#6B98B8] ${monoFont}`}>
-                      Capítulo {String(currentIndex + 1).padStart(2, '0')}
-                    </span>
-                    <p className="text-sm text-[#5E7A93]">
-                      Desliza a la derecha para guardar. Desliza a la izquierda para pasar. También puedes usar los botones.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="h-1.5 w-40 overflow-hidden rounded-full bg-[#8CB9D8]/12">
-                      <motion.div
-                        className="h-full rounded-full bg-[#8CB9D8]"
-                        initial={false}
-                        animate={{ width: `${((currentIndex + 1) / filteredProducts.length) * 100}%` }}
-                      />
+              {stage === 'browse' && currentProduct ? (
+                <motion.div
+                  key={`browse-${currentProduct.id}`}
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -24 }}
+                  className="mx-auto flex min-h-[68vh] max-w-5xl flex-col justify-center"
+                >
+                  <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <span className={`text-[11px] uppercase tracking-[0.36em] text-[#6B98B8] ${monoFont}`}>
+                        Ruta {styleProfile} · Pieza {String(currentIndex + 1).padStart(2, '0')}
+                      </span>
+                      <p className="mt-2 text-sm text-[#5E7A93]">
+                        Desliza a la izquierda para pasar o a la derecha para guardar. También puedes decidir con los botones.
+                      </p>
                     </div>
-                    <span className={`text-[11px] uppercase tracking-[0.36em] text-[#6F8DA7] ${monoFont}`}>
-                      {currentIndex + 1}/{filteredProducts.length}
-                    </span>
+
+                    <div className="flex items-center gap-4">
+                      <div className="h-1.5 w-40 overflow-hidden rounded-full bg-[#8CB9D8]/12">
+                        <motion.div
+                          className="h-full rounded-full bg-[#8CB9D8]"
+                          initial={false}
+                          animate={{ width: `${((currentIndex + 1) / Math.max(questProducts.length, 1)) * 100}%` }}
+                        />
+                      </div>
+                      <span className={`text-[11px] uppercase tracking-[0.36em] text-[#6F8DA7] ${monoFont}`}>
+                        {currentIndex + 1}/{questProducts.length}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                <AnimatePresence mode="wait">
-                  <motion.article
-                    key={currentProduct.id}
-                    drag="x"
-                    dragConstraints={{ left: 0, right: 0 }}
-                    onDragEnd={handleDragEnd}
-                    initial={{ opacity: 0, y: 24, scale: 0.97 }}
-                    animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
-                    exit={{
-                      opacity: 0,
-                      x: swipeDirection > 0 ? 240 : -240,
-                      rotate: swipeDirection > 0 ? 11 : -11,
-                      scale: 0.92,
-                    }}
-                    transition={{ type: 'spring', stiffness: 220, damping: 24 }}
-                    className="mx-auto max-w-5xl cursor-grab active:cursor-grabbing"
-                  >
-                    <QuestCard product={currentProduct} />
-                  </motion.article>
-                </AnimatePresence>
+                  <AnimatePresence mode="wait">
+                    <motion.article
+                      key={currentProduct.id}
+                      drag="x"
+                      dragConstraints={{ left: 0, right: 0 }}
+                      onDrag={(_event, info) => setDragOffset(info.offset.x)}
+                      onDragEnd={handleDragEnd}
+                      initial={{ opacity: 0, y: 24, scale: 0.97 }}
+                      animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                      exit={{
+                        opacity: 0,
+                        x: swipeDirection > 0 ? 260 : -260,
+                        rotate: swipeDirection > 0 ? 10 : -10,
+                        scale: 0.92,
+                      }}
+                      transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+                      className="mx-auto w-full max-w-[28rem] cursor-grab active:cursor-grabbing"
+                    >
+                      <QuestCard product={currentProduct} dragOffset={dragOffset} />
+                    </motion.article>
+                  </AnimatePresence>
 
-                <div className="mx-auto flex max-w-4xl flex-col items-center gap-4 sm:flex-row sm:justify-between">
-                  <div className="flex items-center gap-3">
+                  <div className="mt-8 flex items-center justify-center gap-4">
                     <button
                       onClick={() => handleReaction('pass')}
-                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#8CB9D8]/16 bg-white/72 px-5 text-[#335A77] transition hover:border-[#8CB9D8]/28 hover:bg-white"
+                      className={`inline-flex min-h-14 min-w-14 items-center justify-center rounded-full border px-5 transition ${
+                        passActive
+                          ? 'border-[#335A77] bg-[#335A77] text-[#FCFAF5] shadow-[0_18px_40px_rgba(51,90,119,0.24)]'
+                          : 'border-[#8CB9D8]/16 bg-white/72 text-[#335A77] hover:border-[#8CB9D8]/28 hover:bg-white'
+                      }`}
                       aria-label="Pasar esta pieza"
                     >
-                      <X className="h-5 w-5" />
+                      <X className="h-6 w-6" />
                     </button>
                     <button
                       onClick={() => handleReaction('like')}
-                      className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#8CB9D8]/28 bg-[#8CB9D8] px-6 text-[#FCFAF5] transition hover:bg-[#7DAFCE]"
+                      className={`inline-flex min-h-14 items-center justify-center rounded-full border px-7 transition ${
+                        likeActive
+                          ? 'border-[#8CB9D8] bg-[#8CB9D8] text-[#FCFAF5] shadow-[0_18px_40px_rgba(124,165,193,0.28)]'
+                          : 'border-[#8CB9D8]/28 bg-[#8CB9D8]/12 text-[#335A77] hover:bg-[#E9F4FB]'
+                      }`}
                       aria-label="Guardar esta pieza"
                     >
-                      <Heart className="mr-2 h-5 w-5" />
-                      Añadir a la Colección
+                      <Heart className="mr-3 h-6 w-6" />
+                      Quiero esta
                     </button>
                   </div>
+                </motion.div>
+              ) : null}
 
-                  <div className="flex items-center gap-4">
-                    <Link
-                      href={`/product/${currentProduct.slug}`}
-                      className={`inline-flex min-h-11 items-center justify-center rounded-full border border-[#8CB9D8]/14 px-5 py-2 text-[11px] uppercase tracking-[0.28em] text-[#5E7A93] transition hover:border-[#8CB9D8]/38 hover:text-[#335A77] ${monoFont}`}
-                    >
-                      Ver detalle
-                    </Link>
-                    <span className={`text-[11px] uppercase tracking-[0.32em] text-[#6F8DA7] ${monoFont}`}>
-                      {likedProducts.length} guardadas
+              {stage === 'result' ? (
+                <motion.div
+                  key="result"
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -24 }}
+                  className="grid gap-8 xl:grid-cols-[1.22fr_0.78fr]"
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <span className={`text-[11px] uppercase tracking-[0.38em] text-[#6B98B8] ${monoFont}`}>
+                        Tus favoritas
+                      </span>
+                      <h3 className={`mt-4 text-3xl text-[#335A77] sm:text-4xl ${headingFont}`}>
+                        Compara, configura y llévalas al carrito.
+                      </h3>
+                      <p className="mt-4 max-w-2xl text-sm leading-7 text-[#5E7A93]">
+                        Elige una o varias, define color, talla y cantidad en cada una, y luego sigue al carrito para terminar tu compra con el flujo actual.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      {resultCandidates.map((product) => {
+                        const config = favoriteSelections[product.id]
+                        if (!config) return null
+
+                        return (
+                          <FavoriteSelectionCard
+                            key={product.id}
+                            product={product}
+                            config={config}
+                            onToggle={() =>
+                              updateFavoriteSelection(product.id, (current) => ({
+                                ...current,
+                                selected: !current.selected,
+                              }))
+                            }
+                            onColorChange={(color) =>
+                              updateFavoriteSelection(product.id, (current) => {
+                                const sizes = getAvailableSizes(product, color)
+                                return {
+                                  ...current,
+                                  color,
+                                  size: current.size && sizes.includes(current.size) ? current.size : sizes[0] || null,
+                                }
+                              })
+                            }
+                            onSizeChange={(size) =>
+                              updateFavoriteSelection(product.id, (current) => ({
+                                ...current,
+                                size,
+                              }))
+                            }
+                            onQuantityChange={(quantity) =>
+                              updateFavoriteSelection(product.id, (current) => ({
+                                ...current,
+                                quantity: clamp(quantity, 1, 10),
+                              }))
+                            }
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <aside className="rounded-[30px] border border-[#8CB9D8]/16 bg-white/72 p-6 shadow-[0_24px_80px_rgba(124,165,193,0.14)]">
+                    <span className={`text-[11px] uppercase tracking-[0.38em] text-[#6B98B8] ${monoFont}`}>
+                      Resumen
                     </span>
-                  </div>
-                </div>
-              </motion.div>
-            ) : null}
+                    <h3 className={`mt-5 text-3xl text-[#335A77] ${headingFont}`}>
+                      Listo para pagar.
+                    </h3>
+                    <p className="mt-4 text-sm leading-7 text-[#5E7A93]">
+                      {activeResultProduct ? buildResultCopy(activeResultProduct, likedProducts.length) : 'Configura tus prendas favoritas y llévalas al carrito para terminar la compra.'}
+                    </p>
 
-            {stage === 'result' && topMatch ? (
-              <motion.div
-                key={`result-${topMatch.id}`}
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -24 }}
-                className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]"
-              >
-                <ResultCard
-                  likedCount={likedProducts.length}
-                  product={topMatch}
-                  selectedColor={selectedColor}
-                  selectedSize={selectedSize}
-                  onColorChange={setSelectedColor}
-                  onSizeChange={setSelectedSize}
-                  availableSizes={availableSizes}
-                  colors={resultColors}
-                  checkoutMessage={checkoutMessage}
-                  isPreparingCheckout={isPreparingCheckout}
-                  onCheckout={handleCheckout}
-                  onReset={resetQuest}
-                />
+                    <div className="mt-8 rounded-[24px] border border-[#8CB9D8]/14 bg-[#E9F4FB]/68 p-4">
+                      <span className={`text-[11px] uppercase tracking-[0.34em] text-[#6B98B8] ${monoFont}`}>
+                        Una talla para todas
+                      </span>
+                      <div className="mt-4 grid grid-cols-4 gap-2">
+                        {(['S', 'M', 'L', 'XL'] as Size[]).map((size) => (
+                          <button
+                            key={size}
+                            onClick={() => applySizeToSelectedFavorites(size)}
+                            className="min-h-11 rounded-2xl border border-[#8CB9D8]/18 bg-white/70 text-sm text-[#335A77] transition hover:border-[#8CB9D8]/38"
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                <aside className="rounded-[30px] border border-[#8CB9D8]/16 bg-white/72 p-6 shadow-[0_24px_80px_rgba(124,165,193,0.14)]">
-                  <span className={`text-[11px] uppercase tracking-[0.38em] text-[#6B98B8] ${monoFont}`}>
-                    Notas de selección
-                  </span>
-                  <h3 className={`mt-5 text-3xl text-[#335A77] ${headingFont}`}>
-                    Tu Combinación Perfecta
-                  </h3>
-                  <p className="mt-4 text-sm leading-7 text-[#5E7A93]">
-                    {buildResultCopy(topMatch, likedProducts.length)}
-                  </p>
+                    <div className="mt-6 space-y-3 rounded-[24px] border border-[#8CB9D8]/14 bg-white/76 p-5">
+                      <div className="flex items-center justify-between text-sm text-[#5E7A93]">
+                        <span>Prendas elegidas</span>
+                        <span className="text-[#335A77]">{selectedFavoriteEntries.length}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-[#5E7A93]">
+                        <span>Unidades</span>
+                        <span className="text-[#335A77]">{selectedFavoriteCount}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-[#8CB9D8]/12 pt-3">
+                        <span className="text-sm text-[#5E7A93]">Subtotal</span>
+                        <span className={`text-sm uppercase tracking-[0.28em] text-[#335A77] ${monoFont}`}>
+                          {formatPrice(selectedFavoriteSubtotal)}
+                        </span>
+                      </div>
+                    </div>
 
-                  <div className="mt-8 space-y-4">
-                    <ResultStat
-                      icon={<Sparkles className="h-4 w-4" />}
-                      label="Por qué ganó"
-                      value={topMatch.fitType === 'oversize' ? 'Tiene una caída más editorial y una presencia relajada.' : 'Se siente más precisa, limpia y equilibrada.'}
-                    />
-                    <ResultStat
-                      icon={<Shield className="h-4 w-4" />}
-                      label="Ruta de compra"
-                      value="El flujo de Bold sigue intacto. Esta pantalla solo prepara tu variante y te envía hacia ese proceso de compra."
-                    />
-                    <ResultStat
-                      icon={<ShoppingBag className="h-4 w-4" />}
-                      label="Nota de estilo"
-                      value={topMatch.shortDescription}
-                    />
-                  </div>
-
-                  <div className="mt-8 flex flex-col gap-3 sm:flex-row xl:flex-col">
                     <Button
-                      onClick={handleCheckout}
-                      disabled={!selectedVariant || isPreparingCheckout}
-                      className="min-h-11 rounded-full border border-[#8CB9D8]/28 bg-[#8CB9D8] px-6 text-[#FCFAF5] hover:bg-[#7DAFCE] disabled:opacity-60"
+                      onClick={handleAddSelectedToCart}
+                      disabled={isPreparingCheckout}
+                      className="mt-8 min-h-11 w-full rounded-full border border-[#8CB9D8]/28 bg-[#8CB9D8] px-6 text-[#FCFAF5] hover:bg-[#7DAFCE] disabled:opacity-60"
                     >
-                      {isPreparingCheckout ? 'Abriendo checkout...' : 'Ir al checkout Bold'}
+                      {isPreparingCheckout ? 'Abriendo carrito...' : 'Añadir seleccionadas al carrito'}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
+
+                    {checkoutMessage ? (
+                      <p className="mt-4 text-sm leading-7 text-[#6B98B8]">{checkoutMessage}</p>
+                    ) : null}
+
                     <Button
                       onClick={resetQuest}
                       variant="ghost"
-                      className="min-h-11 rounded-full border border-[#8CB9D8]/14 px-6 text-[#335A77] hover:bg-white/70"
+                      className="mt-8 min-h-11 rounded-full border border-[#8CB9D8]/14 px-6 text-[#335A77] hover:bg-white/70"
                     >
                       <RotateCcw className="mr-2 h-4 w-4" />
                       Reiniciar Experiencia
                     </Button>
-                  </div>
-                </aside>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
+                  </aside>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           )}
         </div>
       </div>
@@ -657,11 +957,18 @@ function CollectionsView({
             <p className="mt-4 max-w-sm text-sm leading-7 text-[#5E7A93]">
               {section.collection.description}
             </p>
+            {section.products.length > 2 ? (
+              <p className={`mt-5 text-[11px] uppercase tracking-[0.32em] text-[#6B98B8] ${monoFont}`}>
+                Desliza para ver más piezas
+              </p>
+            ) : null}
           </aside>
 
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="flex gap-5 overflow-x-auto pb-2 pr-1 snap-x snap-mandatory">
             {section.products.map((product) => (
-              <CollectionsProductCard key={product.id} product={product} />
+              <div key={product.id} className="w-[18rem] flex-none snap-center sm:w-[19rem] lg:w-[20rem]">
+                <CollectionsProductCard product={product} />
+              </div>
             ))}
           </div>
         </section>
@@ -707,111 +1014,77 @@ function IntroPreviewCard({ product }: { product: Product }) {
   )
 }
 
-function QuestCard({ product }: { product: Product }) {
-  const secondaryImage = product.media[1]?.url || product.media[0]?.url || '/placeholder.jpg'
-  const colors = getProductColors(product)
+function QuestCard({ product, dragOffset }: { product: Product; dragOffset: number }) {
+  const colors = getProductColors(product).slice(0, 3)
+  const likeOpacity = clamp(Math.max(dragOffset, 0) / 120, 0, 1)
+  const passOpacity = clamp(Math.max(-dragOffset, 0) / 120, 0, 1)
 
   return (
-    <div className="group overflow-hidden rounded-[34px] border border-[#8CB9D8]/16 bg-[rgba(252,250,245,0.86)] shadow-[0_28px_110px_rgba(124,165,193,0.18)]">
-      <div className="grid min-h-[42rem] gap-0 lg:grid-cols-[0.95fr_1.05fr]">
-        <div className="relative min-h-[24rem] overflow-hidden bg-[#EAF6FC]">
-          <Image
-            src={product.media[0]?.url || '/placeholder.jpg'}
-            alt={product.name}
-            fill
-            priority
-            className="object-cover grayscale transition duration-700 group-hover:scale-[1.03] group-hover:grayscale-0"
-          />
-          <Image
-            src={secondaryImage}
-            alt={`${product.name} vista alterna`}
-            fill
-            className="object-cover opacity-0 transition duration-700 group-hover:opacity-100"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#335A77]/56 via-[#335A77]/10 to-transparent" />
+    <div className="group overflow-hidden rounded-[34px] border border-[#8CB9D8]/16 bg-[rgba(252,250,245,0.88)] shadow-[0_28px_110px_rgba(124,165,193,0.18)]">
+      <div className="relative h-[clamp(31rem,72vh,39rem)] overflow-hidden bg-[#EAF6FC]">
+        <Image
+          src={product.media[0]?.url || '/placeholder.jpg'}
+          alt={product.name}
+          fill
+          priority
+          className="object-cover grayscale transition duration-700 group-hover:scale-[1.03] group-hover:grayscale-0"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#274a66]/72 via-[#274a66]/14 to-transparent" />
 
-          <div className="absolute left-5 top-5 flex flex-wrap gap-2">
-            {product.isNew ? <Badge label="Nueva" /> : null}
-            {product.isHotSale ? <Badge label="Oferta" /> : null}
-            <Badge label={product.collectionId.replace('-', ' ')} />
-          </div>
+        <div className="absolute left-5 top-5 flex flex-wrap gap-2">
+          {product.isNew ? <Badge label="Nueva" /> : null}
+          {product.isHotSale ? <Badge label="Oferta" /> : null}
         </div>
 
-        <div className="flex flex-col justify-between gap-8 p-6 sm:p-8 lg:p-10">
-          <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className={`text-[11px] uppercase tracking-[0.38em] text-[#6B98B8] ${monoFont}`}>
-                Pieza seleccionada
-              </span>
-              <span className={`text-[11px] uppercase tracking-[0.36em] text-[#6F8DA7] ${monoFont}`}>
-                {product.fitType === 'oversize' ? 'Silueta relajada' : 'Silueta precisa'}
-              </span>
-            </div>
+        <motion.div
+          aria-hidden="true"
+          style={{ opacity: passOpacity }}
+          className="absolute left-5 top-20 rounded-full border border-white/18 bg-[#335A77]/82 px-4 py-3 text-[#FCFAF5] backdrop-blur"
+        >
+          <X className="h-6 w-6" />
+        </motion.div>
 
-            <h2 className={`mt-5 text-5xl leading-[0.92] text-[#335A77] sm:text-6xl ${headingFont}`}>
-              {product.name}
-            </h2>
+        <motion.div
+          aria-hidden="true"
+          style={{ opacity: likeOpacity }}
+          className="absolute right-5 top-5 rounded-full border border-white/18 bg-[#8CB9D8]/88 px-4 py-3 text-[#FCFAF5] backdrop-blur"
+        >
+          <Heart className="h-6 w-6" />
+        </motion.div>
 
-            <div className="mt-6 flex flex-wrap items-center gap-4">
-              <span className={`text-sm uppercase tracking-[0.34em] text-[#6B98B8] ${monoFont}`}>
-                {formatPrice(product.price)}
-              </span>
-              {product.compareAtPrice > product.price ? (
-                <span className={`text-sm uppercase tracking-[0.3em] text-[#6F8DA7]/55 line-through ${monoFont}`}>
-                  {formatPrice(product.compareAtPrice)}
+        <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
+          <div className="rounded-[28px] border border-white/16 bg-[linear-gradient(180deg,rgba(17,40,58,0.08),rgba(17,40,58,0.62))] p-5 text-[#FCFAF5] backdrop-blur-md">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span className={`text-[11px] uppercase tracking-[0.34em] text-[#D9ECF8] ${monoFont}`}>
+                  {formatPrice(product.price)}
                 </span>
-              ) : null}
+                <h2 className={`mt-3 text-4xl leading-[0.95] sm:text-5xl ${headingFont}`}>
+                  {product.name}
+                </h2>
+              </div>
+              <span className={`rounded-full border border-white/16 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-[#E8F4FB] ${monoFont}`}>
+                {product.fitType === 'oversize' ? 'Silueta amplia' : 'Silueta precisa'}
+              </span>
             </div>
 
-            <p className="mt-6 max-w-xl rounded-[24px] border border-[#8CB9D8]/14 bg-white/72 px-5 py-5 text-base leading-8 text-[#4D6D88]">
-              {product.description}
+            <p className="mt-4 max-w-md text-sm leading-7 text-[#F3F8FB]/92">
+              {product.shortDescription}
             </p>
-          </div>
 
-          <div className="grid gap-6 border-t border-[#8CB9D8]/12 pt-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <span className={`text-[11px] uppercase tracking-[0.34em] text-[#6B98B8] ${monoFont}`}>
-                  Opciones de color
+            <div className="mt-5 flex flex-wrap gap-2">
+              {colors.map((color) => (
+                <span
+                  key={color.color}
+                  className="inline-flex min-h-11 items-center gap-3 rounded-full border border-white/14 bg-white/10 px-4 py-2 text-sm text-[#F8FBFD]"
+                >
+                  <span
+                    className="h-4 w-4 rounded-full border border-white/40"
+                    style={{ backgroundColor: color.colorHex }}
+                  />
+                  {color.color}
                 </span>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  {colors.map((color) => (
-                    <span
-                      key={color.color}
-                      className="inline-flex min-h-11 items-center gap-3 rounded-full border border-[#8CB9D8]/14 bg-white/62 px-4 py-2 text-sm text-[#4D6D88]"
-                    >
-                      <span
-                        className="h-4 w-4 rounded-full border border-white/50"
-                        style={{ backgroundColor: color.colorHex }}
-                      />
-                      {color.color}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <span className={`text-[11px] uppercase tracking-[0.34em] text-[#6B98B8] ${monoFont}`}>
-                  Notas de experiencia
-                </span>
-                <ul className="mt-4 space-y-3 rounded-[22px] border border-[#8CB9D8]/14 bg-white/72 px-4 py-4 text-sm leading-7 text-[#4D6D88]">
-                  <li>Ves una sola pieza al centro para decidir con calma.</li>
-                  <li>Las imágenes se mantienen en escala de grises hasta acercarte.</li>
-                  <li>El paso final conserva intacto tu proceso de compra actual con Bold.</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <Link
-                href={`/product/${product.slug}`}
-                className={`inline-flex min-h-11 items-center rounded-full border border-[#8CB9D8]/16 px-5 py-2 text-[11px] uppercase tracking-[0.3em] text-[#5E7A93] transition hover:border-[#8CB9D8]/35 hover:text-[#335A77] ${monoFont}`}
-              >
-                Ver ficha
-              </Link>
-              <span className={`text-[11px] uppercase tracking-[0.3em] text-[#6F8DA7] ${monoFont}`}>
-                Desliza para decidir
-              </span>
+              ))}
             </div>
           </div>
         </div>
@@ -869,8 +1142,9 @@ function CollectionsProductCard({ product }: { product: Product }) {
           {product.isNew ? <Badge label="Nueva" /> : null}
           {product.isHotSale ? <Badge label="Oferta" /> : null}
         </div>
-        <div className="absolute inset-x-0 bottom-0 p-4">
-          <div className="rounded-[22px] border border-white/16 bg-[linear-gradient(180deg,rgba(17,40,58,0.14),rgba(17,40,58,0.62))] p-4 text-[#FCFAF5] backdrop-blur-md">
+        <div className="absolute inset-0 bg-gradient-to-t from-[#335A77]/52 via-transparent to-transparent opacity-0 transition duration-500 group-hover:opacity-100 group-focus-within:opacity-100" />
+        <div className="absolute inset-x-0 bottom-0 translate-y-5 p-4 opacity-0 transition duration-500 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+          <div className="rounded-[22px] border border-white/16 bg-[linear-gradient(180deg,rgba(17,40,58,0.18),rgba(17,40,58,0.7))] p-4 text-[#FCFAF5] backdrop-blur-md">
             <span className={`text-[11px] uppercase tracking-[0.34em] text-[#D9ECF8] ${monoFont}`}>
               {formatPrice(product.price)}
             </span>
@@ -884,7 +1158,7 @@ function CollectionsProductCard({ product }: { product: Product }) {
                 disabled={!selectedVariant || isPreparingCheckout}
                 className="min-h-11 rounded-full border border-white/18 bg-white/18 px-4 text-[11px] uppercase tracking-[0.26em] text-[#FCFAF5] backdrop-blur hover:bg-white/26 disabled:opacity-60"
               >
-                {isPreparingCheckout ? 'Abriendo...' : 'Bold Checkout'}
+                {isPreparingCheckout ? 'Abriendo...' : 'Lo quiero'}
               </Button>
               <Link
                 href={`/product/${product.slug}`}
@@ -900,6 +1174,147 @@ function CollectionsProductCard({ product }: { product: Product }) {
         </div>
       </div>
     </motion.article>
+  )
+}
+
+function FavoriteSelectionCard({
+  product,
+  config,
+  onToggle,
+  onColorChange,
+  onSizeChange,
+  onQuantityChange,
+}: {
+  product: Product
+  config: FavoriteSelectionConfig
+  onToggle: () => void
+  onColorChange: (color: string) => void
+  onSizeChange: (size: Size) => void
+  onQuantityChange: (quantity: number) => void
+}) {
+  const colors = getProductColors(product)
+  const availableSizes = getAvailableSizes(product, config.color)
+
+  return (
+    <div
+      className={`overflow-hidden rounded-[28px] border shadow-[0_18px_60px_rgba(124,165,193,0.12)] transition ${
+        config.selected
+          ? 'border-[#8CB9D8] bg-[#FCFAF5]'
+          : 'border-[#8CB9D8]/14 bg-white/72'
+      }`}
+    >
+      <div className="relative aspect-[4/5] overflow-hidden">
+        <Image
+          src={product.media[0]?.url || '/placeholder.jpg'}
+          alt={product.name}
+          fill
+          className="object-cover grayscale transition duration-700 hover:scale-[1.03] hover:grayscale-0"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#335A77]/58 via-[#335A77]/8 to-transparent" />
+        <button
+          onClick={onToggle}
+          className={`absolute right-4 top-4 min-h-11 rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.26em] backdrop-blur transition ${
+            config.selected
+              ? 'border-white/18 bg-[#8CB9D8] text-[#FCFAF5]'
+              : 'border-white/18 bg-white/18 text-[#FCFAF5]'
+          } ${monoFont}`}
+        >
+          {config.selected ? 'Elegida' : 'Elegir'}
+        </button>
+        <div className="absolute inset-x-0 bottom-0 p-5 text-[#FCFAF5]">
+          <span className={`text-[11px] uppercase tracking-[0.34em] text-[#D9ECF8] ${monoFont}`}>
+            {formatPrice(product.price)}
+          </span>
+          <h4 className={`mt-3 text-3xl ${headingFont}`}>{product.name}</h4>
+          <p className="mt-3 max-w-sm text-sm leading-6 text-[#F5F8FB]/92">
+            {product.shortDescription}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-5 p-5">
+        <div>
+          <span className={`text-[11px] uppercase tracking-[0.34em] text-[#6B98B8] ${monoFont}`}>
+            Color
+          </span>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {colors.map((color) => {
+              const isActive = color.color === config.color
+
+              return (
+                <button
+                  key={color.color}
+                  onClick={() => onColorChange(color.color)}
+                  className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm transition ${
+                    isActive
+                      ? 'border-[#8CB9D8] bg-[#E9F4FB] text-[#335A77]'
+                      : 'border-[#8CB9D8]/14 text-[#5E7A93] hover:border-[#8CB9D8]/35'
+                  }`}
+                >
+                  <span
+                    className="h-4 w-4 rounded-full border border-white/40"
+                    style={{ backgroundColor: color.colorHex }}
+                  />
+                  {color.color}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div>
+          <span className={`text-[11px] uppercase tracking-[0.34em] text-[#6B98B8] ${monoFont}`}>
+            Talla
+          </span>
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            {(['S', 'M', 'L', 'XL'] as Size[]).map((size) => {
+              const isAvailable = availableSizes.includes(size)
+              const isActive = config.size === size
+
+              return (
+                <button
+                  key={size}
+                  onClick={() => isAvailable && onSizeChange(size)}
+                  disabled={!isAvailable}
+                  className={`min-h-11 rounded-2xl border text-sm transition ${
+                    isActive
+                      ? 'border-[#8CB9D8] bg-[#8CB9D8] text-[#FCFAF5]'
+                      : isAvailable
+                        ? 'border-[#8CB9D8]/14 text-[#335A77] hover:border-[#8CB9D8]/35'
+                        : 'border-[#8CB9D8]/8 bg-[#F7FBFE] text-[#A7BAC9]'
+                  }`}
+                >
+                  {size}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-[22px] border border-[#8CB9D8]/14 bg-[#E9F4FB]/58 px-4 py-3">
+          <span className={`text-[11px] uppercase tracking-[0.34em] text-[#6B98B8] ${monoFont}`}>
+            Cantidad
+          </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => onQuantityChange(config.quantity - 1)}
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#8CB9D8]/18 bg-white/80 text-[#335A77]"
+              aria-label="Reducir cantidad"
+            >
+              -
+            </button>
+            <span className="w-6 text-center text-sm text-[#335A77]">{config.quantity}</span>
+            <button
+              onClick={() => onQuantityChange(config.quantity + 1)}
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#8CB9D8]/18 bg-white/80 text-[#335A77]"
+              aria-label="Aumentar cantidad"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -932,6 +1347,8 @@ function ResultCard({
   selectedColor,
   selectedSize,
 }: ResultCardProps) {
+  const hasValidSelection = selectedSize !== null && availableSizes.includes(selectedSize)
+
   return (
     <div className="overflow-hidden rounded-[34px] border border-[#8CB9D8]/18 bg-[rgba(252,250,245,0.86)] shadow-[0_28px_110px_rgba(124,165,193,0.18)]">
       <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr]">
@@ -1044,10 +1461,10 @@ function ResultCard({
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button
               onClick={onCheckout}
-              disabled={!selectedSize || isPreparingCheckout}
+              disabled={!hasValidSelection || isPreparingCheckout}
               className="min-h-11 flex-1 rounded-full border border-[#8CB9D8]/28 bg-[#8CB9D8] px-6 text-[#FCFAF5] hover:bg-[#7DAFCE] disabled:opacity-60"
             >
-              Ir al checkout Bold
+              {isPreparingCheckout ? 'Abriendo checkout...' : 'Lo quiero'}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             <Button
@@ -1073,37 +1490,6 @@ function ResultCard({
   )
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[22px] border border-[#8CB9D8]/12 bg-white/62 px-4 py-3">
-      <span className={`block text-[10px] uppercase tracking-[0.32em] text-[#6B98B8] ${monoFont}`}>
-        {label}
-      </span>
-      <span className="mt-2 block text-sm text-[#4D6D88]">{value}</span>
-    </div>
-  )
-}
-
-function ResultStat({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode
-  label: string
-  value: string
-}) {
-  return (
-    <div className="rounded-[22px] border border-[#8CB9D8]/14 bg-white/68 p-4">
-      <div className="flex items-center gap-3 text-[#6B98B8]">
-        {icon}
-        <span className={`text-[10px] uppercase tracking-[0.32em] ${monoFont}`}>{label}</span>
-      </div>
-      <p className="mt-3 text-sm leading-7 text-[#4D6D88]">{value}</p>
-    </div>
-  )
-}
-
 function Badge({ label }: { label: string }) {
   return (
     <span className={`rounded-full border border-white/30 bg-white/58 px-3 py-2 text-[10px] uppercase tracking-[0.28em] text-[#335A77] backdrop-blur ${monoFont}`}>
@@ -1124,10 +1510,21 @@ function getAvailableSizes(product: Product, color: string) {
     .map((variant) => variant.size)
 }
 
-function getQuestScore(product: Product, productCount: number, likeIndex: number) {
+function getQuestScore(
+  product: Product,
+  productCount: number,
+  likeIndex: number,
+  styleProfile: StyleProfile = 'hombre',
+) {
+  const profileBias =
+    styleProfile === 'mujer'
+      ? (product.fitType === 'oversize' ? 8 : 3) + (product.isNew ? 5 : 0)
+      : (product.fitType === 'regular' ? 8 : 3) + (product.isHotSale ? 5 : 0)
+
   return (
     productCount * 2 -
     likeIndex +
+    profileBias +
     (product.isNew ? 20 : 0) +
     (product.isHotSale ? 12 : 0) +
     (product.fitType === 'oversize' ? 6 : 3)

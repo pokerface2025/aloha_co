@@ -69,7 +69,7 @@ export function BestSellersSection() {
               Suscríbete
             </span>
             <h2 className={`mt-4 text-4xl text-[#335A77] sm:text-5xl ${headingFont}`}>
-              Recibe 10% de descuento en tu primera compra.
+              10% de descuento en tu primera compra.
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-[#5E7A93]">
               Déjanos tu correo y te reservamos un código de bienvenida para entrar a ALOHA con una ventaja desde el primer pedido.
@@ -78,10 +78,7 @@ export function BestSellersSection() {
 
           <form onSubmit={handleSubmit} className="mx-auto mt-8 max-w-4xl">
             <div className="rounded-[28px] border border-[#8CB9D8]/14 bg-white/72 p-4 sm:p-5">
-              <div className="mb-4 flex justify-center">
-                <span className={`inline-flex min-h-11 items-center rounded-full border border-[#8CB9D8]/18 bg-[#EAF6FC] px-5 text-[11px] uppercase tracking-[0.3em] text-[#6B98B8] ${monoFont}`}>
-                  10% en tu primera compra
-                </span>
+              <div className="mb-4 flex justify-center">                
               </div>
 
               <div className="flex flex-col gap-3 lg:flex-row">

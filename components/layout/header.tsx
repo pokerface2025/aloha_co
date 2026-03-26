@@ -9,7 +9,7 @@ import { GlassNavbar } from '@/components/ui/glass-navbar'
 import { useCartStore } from '@/lib/store'
 
 const navigation = [
-  { name: 'Colecciones', href: '/shop?view=collections' },
+  { name: 'Colecciones', href: '/shop' },
 ]
 
 export function Header() {
