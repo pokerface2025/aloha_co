@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore, type AuthSession } from "@/lib/auth-store";
+import { networkFetch, TokenExpiredError, NetworkError } from "@/lib/network/networkManager";
 
 export function LoginForm() {
   const router = useRouter();
@@ -25,29 +26,25 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: username.trim(),
-          password,
-        }),
+      const data = await networkFetch("login", {
+        username: username.trim(),
+        password,
       });
-
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(data?.error || data?.message || "No se pudo iniciar sesión.");
-      }
 
       setSession(data as AuthSession);
       router.push(redirectTo);
       router.refresh();
     } catch (submitError) {
-      setError(
-        submitError instanceof Error ? submitError.message : "Error inesperado al iniciar sesión."
-      );
+      if (submitError instanceof TokenExpiredError) {
+        setError(submitError.message);
+        router.push("/login");
+      } else if (submitError instanceof NetworkError) {
+        setError(submitError.message);
+      } else {
+        setError(
+          submitError instanceof Error ? submitError.message : "Error inesperado al iniciar sesión."
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
