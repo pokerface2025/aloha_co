@@ -1,2 +1,2 @@
 # aloha_co
-lucrum financiera
+lucrum financiera SAS
