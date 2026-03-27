@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShoppingBag, Ruler, Truck, MapPin, Check, ChevronLeft, ChevronRight, Info } from 'lucide-react'
+import { ShoppingBag, Ruler, Truck, MapPin, Check, ChevronLeft, ChevronRight, Info, Minus, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -424,18 +424,46 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
           {/* Action Buttons */}
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex items-stretch gap-2">
-              <div className="flex w-20 items-center justify-center rounded-xl border border-border bg-white/50 backdrop-blur-sm">
-                <Input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={quantity}
-                  onChange={(event) => handleQuantityChange(Number(event.target.value))}
-                  className="h-11 border-0 bg-transparent text-center text-sm font-medium text-foreground"
-                  aria-label="Cantidad"
-                />
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-foreground">
+                Cantidad
+              </label>
+              <div className="flex items-stretch gap-2">
+                <div className="flex min-h-12 items-center rounded-2xl border border-border bg-white/70 px-2 shadow-sm backdrop-blur-sm">
+                  <button
+                    onClick={() => handleQuantityChange(quantity - 1)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-foreground transition hover:bg-muted"
+                    aria-label="Reducir cantidad"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={10}
+                    value={quantity}
+                    onChange={(event) => handleQuantityChange(Number(event.target.value))}
+                    className="h-10 w-14 border-0 bg-transparent px-0 text-center text-base font-semibold text-foreground shadow-none focus-visible:ring-0"
+                    aria-label="Cantidad"
+                  />
+                  <button
+                    onClick={() => handleQuantityChange(quantity + 1)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-foreground transition hover:bg-muted"
+                    aria-label="Aumentar cantidad"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex items-center rounded-2xl border border-border bg-white/50 px-3 text-xs text-muted-foreground backdrop-blur-sm">
+                  Máx. 10
+                </div>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Ajusta aquí cuántas unidades quieres añadir.
+              </p>
+            </div>
+            <div className="grid gap-3">
               <GlassButton
                 onClick={handleAddToCart}
                 disabled={!selectedSize || isAdded}
@@ -454,16 +482,16 @@ export function ProductDetail({ product }: ProductDetailProps) {
                   </>
                 )}
               </GlassButton>
+              <GlassButton
+                onClick={handleBuyNow}
+                disabled={!selectedSize}
+                size="lg"
+                variant="default"
+                className="w-full bg-primary/90 text-primary-foreground border-primary/40 hover:bg-primary"
+              >
+                Comprar ahora
+              </GlassButton>
             </div>
-            <GlassButton
-              onClick={handleBuyNow}
-              disabled={!selectedSize}
-              size="lg"
-              variant="default"
-              className="w-full bg-primary/90 text-primary-foreground border-primary/40 hover:bg-primary"
-            >
-              Comprar ahora
-            </GlassButton>
           </div>
 
           {!selectedSize && (

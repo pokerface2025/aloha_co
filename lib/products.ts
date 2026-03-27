@@ -20,6 +20,9 @@ import type { Product } from './types'
 
 export type AudienceMode = 'adult' | 'kids'
 
+export const WHATSAPP_PHONE_NUMBER =
+  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '573000000000'
+
 export const COLOMBIAN_DEPARTMENTS = [
   'Amazonas',
   'Antioquia',
@@ -442,4 +445,12 @@ export function formatPrice(price: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(price)
+}
+
+export function buildWhatsAppProductUrl(productName: string, slug: string): string {
+  const message = encodeURIComponent(
+    `Hola, quiero consultar por ${productName}. Vi este producto: /tienda/${slug}`,
+  )
+
+  return `https://wa.me/${WHATSAPP_PHONE_NUMBER}?text=${message}`
 }
