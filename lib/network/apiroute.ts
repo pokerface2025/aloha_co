@@ -1,4 +1,5 @@
 export const apiRoute = {
+    orderList: "/orders/list",
     createOrder: "/orders/reg",
     login: "/auth/login",
 

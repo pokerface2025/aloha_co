@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/lib/auth-store";
 import { formatPrice } from "@/lib/products";
+import { networkFetch } from "@/lib/network/networkManager";
 
 type AdminOrderItem = {
   productId: string;
@@ -57,6 +58,15 @@ const formatDate = (value: string) => {
   }).format(parsed);
 };
 
+const formatStatus = (status: string): string => {
+  switch (status.toUpperCase()) {
+    case "ACTIVE":
+      return "Pendiente de pago";
+    default:
+      return status;
+  }
+};
+
 const getStatusTone = (status: string) => {
   switch (status.toUpperCase()) {
     case "APPROVED":
@@ -64,6 +74,7 @@ const getStatusTone = (status: string) => {
       return "bg-emerald-500/12 text-emerald-700 border-emerald-600/20";
     case "PENDING":
     case "PENDING_PAYMENT":
+    case "ACTIVE":
       return "bg-amber-500/12 text-amber-700 border-amber-600/20";
     case "REJECTED":
     case "FAILED":
@@ -100,20 +111,11 @@ export function OrdersConsole() {
     setError("");
 
     try {
-      const response = await fetch("/api/orders/list", {
-        headers: {
-          Authorization: `Bearer ${session.token}`,
-        },
-      });
 
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(data?.error || data?.message || "No se pudo cargar la lista de órdenes.");
-      }
+      const result: any = await networkFetch("orderList");
 
-      const nextOrders = Array.isArray(data) ? (data as AdminOrder[]) : [];
-      setOrders(nextOrders);
-      setSelectedId((current) => current || nextOrders[0]?._id || "");
+      setOrders(result);
+      setSelectedId((current) => current || result[0]?._id || "");
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Error inesperado.");
     } finally {
@@ -256,11 +258,10 @@ export function OrdersConsole() {
                 key={order._id}
                 type="button"
                 onClick={() => setSelectedId(order._id)}
-                className={`w-full rounded-2xl border p-4 text-left transition-colors ${
-                  selectedOrder?._id === order._id
+                className={`w-full rounded-2xl border p-4 text-left transition-colors ${selectedOrder?._id === order._id
                     ? "border-foreground/20 bg-foreground/5"
                     : "border-border/60 hover:bg-background/70"
-                }`}
+                  }`}
               >
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <div>
@@ -272,7 +273,7 @@ export function OrdersConsole() {
                   <span
                     className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.18em] ${getStatusTone(order.status)}`}
                   >
-                    {order.status}
+                    {formatStatus(order.status)}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">{order._id}</p>
@@ -304,7 +305,7 @@ export function OrdersConsole() {
                   <span
                     className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] ${getStatusTone(selectedOrder.status)}`}
                   >
-                    {selectedOrder.status}
+                    {formatStatus(selectedOrder.status)}
                   </span>
                   {selectedOrder.paymentReferenceId ? (
                     <p className="text-sm text-muted-foreground">
