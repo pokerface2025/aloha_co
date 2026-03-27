@@ -112,7 +112,7 @@ export function ProductCard({ product, priority = false, index = 0 }: ProductCar
       y: 0,
       transition: {
         duration: 0.6,
-        ease: [0.22, 1, 0.36, 1],
+        ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
         delay: index * 0.2,
       },
     }),

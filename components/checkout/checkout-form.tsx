@@ -17,6 +17,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCartStore } from "@/lib/store";
 import { formatPrice, COLOMBIAN_DEPARTMENTS, getProductById } from "@/lib/products";
+import { networkFetch } from "@/lib/network/networkManager";
+import { apiRoute } from "@/lib/network/apiroute";
 
 type CheckoutStep = "information" | "shipping" | "payment";
 
@@ -153,46 +155,37 @@ export function CheckoutForm() {
         console.warn("No se pudo guardar la orden en localStorage", storageError);
       }
 
-      const orderResponse = await fetch("/api/orders/reg", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          phone: formData.phone,
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
-          address: formData.address.trim(),
-          apartment: formData.apartment.trim(),
-          city: formData.city.trim(),
-          department: formData.department,
-          postalCode: formData.postalCode.trim(),
-          saveInfo: formData.saveInfo,
-          shippingMethod: shippingMode === "free" ? "Envío Estándar Gratis" : "Envío Estándar",
-          productsSubtotal: subtotal,
-          shippingCost,
-          shippingMode,
-          shippingNote,
-          notes: formData.notes.trim(),
-          callbackUrl,
-          imgUrl: primaryImage ? `${window.location.origin}${primaryImage}` : window.location.origin,
-          items: checkoutItems.map((item) => ({
-            productId: item.productId,
-            variantSku: item.variantSku,
-            size: item.size,
-            color: item.color,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            lineTotal: item.lineTotal,
-          })),
-        }),
-      });
-
-      const orderData = await orderResponse.json().catch(() => null);
-      if (!orderResponse.ok) {
-        throw new Error(orderData?.error || orderData?.message || "No se pudo registrar la orden.");
+      const body = {
+        email: formData.email,
+        phone: formData.phone,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        address: formData.address.trim(),
+        apartment: formData.apartment.trim(),
+        city: formData.city.trim(),
+        department: formData.department,
+        postalCode: formData.postalCode.trim(),
+        saveInfo: formData.saveInfo,
+        shippingMethod: shippingMode === "free" ? "Envío Estándar Gratis" : "Envío Estándar",
+        productsSubtotal: subtotal,
+        shippingCost,
+        shippingMode,
+        shippingNote,
+        notes: formData.notes.trim(),
+        callbackUrl,
+        imgUrl: primaryImage ? `${window.location.origin}${primaryImage}` : window.location.origin,
+        items: checkoutItems.map((item) => ({
+          productId: item.productId,
+          variantSku: item.variantSku,
+          size: item.size,
+          color: item.color,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          lineTotal: item.lineTotal,
+        })),
       }
+
+      const orderData: any = await networkFetch("createOrder", body)
 
       clearCart();
 
@@ -508,14 +501,14 @@ export function CheckoutForm() {
                       size="lg"
                       disabled={isProcessing}
                     >
-                    {isProcessing ? (
-                      <span className="flex items-center gap-2">
-                        <span className="h-4 w-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
-                        Procesando...
-                      </span>
-                    ) : (
-                      `Pagar ${formatPrice(totalDueNow)}`
-                    )}
+                      {isProcessing ? (
+                        <span className="flex items-center gap-2">
+                          <span className="h-4 w-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
+                          Procesando...
+                        </span>
+                      ) : (
+                        `Pagar ${formatPrice(totalDueNow)}`
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -534,33 +527,34 @@ export function CheckoutForm() {
                 if (!product) return null;
 
                 return (
-                <div key={item.variantSku} className="flex gap-4">
-                  <div className="relative w-16 h-16 bg-secondary rounded-lg overflow-hidden flex-shrink-0">
-                    <Image
-                      src={product.media[0]?.url || "/placeholder.svg"}
-                      alt={product.name}
-                      fill
-                      className="object-cover"
-                    />
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-foreground text-background text-xs rounded-full flex items-center justify-center">
-                      {item.quantity}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground text-sm truncate">
-                      {product.name}
+                  <div key={item.variantSku} className="flex gap-4">
+                    <div className="relative w-16 h-16 bg-secondary rounded-lg overflow-hidden flex-shrink-0">
+                      <Image
+                        src={product.media[0]?.url || "/placeholder.svg"}
+                        alt={product.name}
+                        fill
+                        className="object-cover"
+                      />
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-foreground text-background text-xs rounded-full flex items-center justify-center">
+                        {item.quantity}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground text-sm truncate">
+                        {product.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.color} / {item.size}
+                      </p>
+                    </div>
+                    <p className="font-medium text-foreground text-sm">
+                      {formatPrice(
+                        product.price * item.quantity
+                      )}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.color} / {item.size}
-                    </p>
                   </div>
-                  <p className="font-medium text-foreground text-sm">
-                    {formatPrice(
-                      product.price * item.quantity
-                    )}
-                  </p>
-                </div>
-              )})}
+                )
+              })}
             </div>
 
             {/* Discount Code */}

@@ -122,7 +122,7 @@ export function CartPageContent() {
                               <p className="mt-1 text-sm text-muted-foreground">
                                 {item.color} / Talla {item.size}
                               </p>
-                              <p className="mt-1 text-sm text-muted-foreground capitalize">
+                              <p className="mt-1 text-sm text-muted-foreground">
                                 {product.fitType} Fit
                               </p>
                             </div>
