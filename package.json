@@ -8,6 +8,7 @@
     "db:push": "node --import tsx prisma/push.ts",
     "db:seed": "prisma db seed",
     "dev": "next dev",
+    "dev:prod": "next start",
     "lint": "eslint .",
     "start": "next start"
   },

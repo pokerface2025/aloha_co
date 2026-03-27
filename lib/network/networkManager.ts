@@ -21,9 +21,10 @@ export class NetworkError extends Error {
 }
 
 export async function networkFetch(route: ApiRoute, body?: any) {
-    const uri = "http://localhost:4000"   // TODO: make this dynamic
+
+    const uri = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
     const fullURI = uri + apiRoute[route];
-   
+
     // Obtener sesión del store
     const session = useAuthStore.getState().session;
     const isExpired = useAuthStore.getState().isExpired();
@@ -45,9 +46,13 @@ export async function networkFetch(route: ApiRoute, body?: any) {
     }
 
     const reqInit: RequestInit = {
-        body: body ? JSON.stringify(body) : undefined,
+        
         headers,
         method: "POST",
+    }
+
+    if (body) {
+        reqInit.body = JSON.stringify(body);
     }
 
     const result = await fetch(fullURI, reqInit);
