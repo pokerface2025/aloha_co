@@ -18,6 +18,7 @@ type ShopView = 'quest' | 'collections'
 type QuestStage = 'intro' | 'browse' | 'result'
 type QuestReaction = 'like' | 'pass'
 type StyleProfile = 'hombre' | 'mujer'
+type SizeMode = 'global' | 'individual'
 type FavoriteSelectionConfig = {
   selected: boolean
   color: string
@@ -70,6 +71,9 @@ export function ShopContent() {
   const [dragOffset, setDragOffset] = useState(0)
   const [likedProducts, setLikedProducts] = useState<Array<{ product: Product; score: number }>>([])
   const [favoriteSelections, setFavoriteSelections] = useState<Record<string, FavoriteSelectionConfig>>({})
+  const [questColors, setQuestColors] = useState<Record<string, string>>({})
+  const [sizeMode, setSizeMode] = useState<SizeMode>('individual')
+  const [globalSize, setGlobalSize] = useState<Size | null>(null)
   const [selectedResultProductId, setSelectedResultProductId] = useState('')
   const [selectedColor, setSelectedColor] = useState('')
   const [selectedSize, setSelectedSize] = useState<Size | null>(null)
@@ -121,6 +125,9 @@ export function ShopContent() {
   }, [filteredProducts, styleProfile])
 
   const currentProduct = questProducts[currentIndex] || null
+  const currentQuestColor = currentProduct
+    ? questColors[currentProduct.id] || getProductColors(currentProduct)[0]?.color || ''
+    : ''
 
   const resultCandidates = useMemo(() => {
     if (likedProducts.length > 0) {
@@ -245,6 +252,9 @@ export function ShopContent() {
     setDragOffset(0)
     setLikedProducts([])
     setFavoriteSelections({})
+    setQuestColors({})
+    setSizeMode('individual')
+    setGlobalSize(null)
     setSelectedResultProductId('')
     setCheckoutMessage('')
     setIsPreparingCheckout(false)
@@ -316,6 +326,22 @@ export function ShopContent() {
     })
   }, [likedProducts.length, resultCandidates])
 
+  useEffect(() => {
+    if (!currentProduct) return
+
+    const colors = getProductColors(currentProduct)
+    if (colors.length === 0) return
+
+    setQuestColors((previousColors) => {
+      if (previousColors[currentProduct.id]) return previousColors
+
+      return {
+        ...previousColors,
+        [currentProduct.id]: colors[0].color,
+      }
+    })
+  }, [currentProduct])
+
   const beginQuest = () => {
     setStage('browse')
     setCheckoutMessage('')
@@ -323,6 +349,9 @@ export function ShopContent() {
     setCurrentIndex(0)
     setLikedProducts([])
     setFavoriteSelections({})
+    setQuestColors({})
+    setSizeMode('individual')
+    setGlobalSize(null)
     setSelectedResultProductId('')
     setSwipeDirection(1)
     setDragOffset(0)
@@ -337,6 +366,9 @@ export function ShopContent() {
     setCurrentIndex(0)
     setLikedProducts([])
     setFavoriteSelections({})
+    setQuestColors({})
+    setSizeMode('individual')
+    setGlobalSize(null)
     setSelectedResultProductId('')
     setSwipeDirection(1)
     setDragOffset(0)
@@ -349,6 +381,9 @@ export function ShopContent() {
     setCurrentIndex(0)
     setLikedProducts([])
     setFavoriteSelections({})
+    setQuestColors({})
+    setSizeMode('individual')
+    setGlobalSize(null)
     setSelectedResultProductId('')
     setSwipeDirection(1)
     setDragOffset(0)
@@ -468,6 +503,8 @@ export function ShopContent() {
   }
 
   const applySizeToSelectedFavorites = (size: Size) => {
+    setSizeMode('global')
+    setGlobalSize(size)
     setFavoriteSelections((previousSelections) => {
       const nextSelections = { ...previousSelections }
 
@@ -594,14 +631,20 @@ export function ShopContent() {
     (total, entry) => total + entry.product.price * (entry.config?.quantity || 0),
     0,
   )
+  const hasGlobalSelectionCoverage =
+    sizeMode !== 'global' ||
+    selectedFavoriteEntries.every((entry) => {
+      if (!globalSize || !entry.config) return false
+      return getAvailableSizes(entry.product, entry.config.color).includes(globalSize)
+    })
 
   return (
     <section className={`relative isolate overflow-hidden ${bodyFont}`}>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[36rem] bg-[radial-gradient(circle_at_top,rgba(140,185,216,0.24),transparent_52%)]" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[24rem] bg-[radial-gradient(circle_at_bottom,rgba(227,210,182,0.14),transparent_48%)]" />
 
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
-        <div className="flex flex-col gap-6 rounded-[32px] border border-[#8CB9D8]/18 bg-[rgba(252,250,245,0.78)] p-5 shadow-[0_20px_100px_rgba(124,165,193,0.14)] backdrop-blur sm:p-8">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
+        <div className="flex flex-col gap-6 rounded-[28px] border border-[#8CB9D8]/18 bg-[rgba(252,250,245,0.78)] p-4 shadow-[0_20px_100px_rgba(124,165,193,0.14)] backdrop-blur sm:rounded-[32px] sm:p-8">
           <div className="flex flex-col gap-5 border-b border-[#8CB9D8]/12 pb-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
               <span className={`text-[11px] uppercase tracking-[0.38em] text-[#6B98B8] ${monoFont}`}>
@@ -617,7 +660,7 @@ export function ShopContent() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
               {([
                 { id: 'quest', label: 'El Proceso' },
                 { id: 'collections', label: 'Colecciones' },
@@ -628,7 +671,7 @@ export function ShopContent() {
                   <button
                     key={option.id}
                     onClick={() => handleViewChange(option.id)}
-                    className={`min-h-11 rounded-full border px-6 py-2 text-left text-[11px] uppercase tracking-[0.26em] transition ${
+                    className={`min-h-11 rounded-full border px-4 py-2 text-center text-[11px] uppercase tracking-[0.26em] transition sm:px-6 sm:text-left ${
                       isActive
                         ? 'border-[#8CB9D8] bg-[#8CB9D8] text-[#FCFAF5] shadow-[0_16px_40px_rgba(124,165,193,0.22)]'
                         : 'border-[#8CB9D8]/18 bg-transparent text-[#5E7A93] hover:border-[#8CB9D8]/45 hover:text-[#335A77]'
@@ -651,9 +694,9 @@ export function ShopContent() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="overflow-hidden rounded-[32px] border border-[#8CB9D8]/16 bg-[rgba(252,250,245,0.72)] shadow-[0_24px_90px_rgba(124,165,193,0.12)]"
+                  className="overflow-hidden rounded-[28px] border border-[#8CB9D8]/16 bg-[rgba(252,250,245,0.72)] shadow-[0_24px_90px_rgba(124,165,193,0.12)] sm:rounded-[32px]"
                 >
-                  <div className="grid min-h-[68vh] md:grid-cols-2">
+                  <div className="grid min-h-[56vh] md:min-h-[68vh] md:grid-cols-2">
                     {([
                       {
                         id: 'hombre',
@@ -673,7 +716,7 @@ export function ShopContent() {
                       <button
                         key={option.id}
                         onClick={() => startGuidedSelection(option.id)}
-                        className={`group relative min-h-[34rem] overflow-hidden text-left ${
+                        className={`group relative min-h-[24rem] overflow-hidden text-left sm:min-h-[30rem] md:min-h-[34rem] ${
                           index === 0 ? 'border-b md:border-b-0 md:border-r' : ''
                         } border-[#8CB9D8]/16`}
                       >
@@ -690,7 +733,7 @@ export function ShopContent() {
                           <span className={`text-[11px] uppercase tracking-[0.38em] text-[#D9ECF8] ${monoFont}`}>
                             Elige tu ruta
                           </span>
-                          <h2 className={`mt-4 text-4xl text-[#FCFAF5] sm:text-5xl ${headingFont}`}>
+                          <h2 className={`mt-4 text-3xl text-[#FCFAF5] sm:text-5xl ${headingFont}`}>
                             {option.title}
                           </h2>
                           <p className="mt-4 max-w-sm text-sm leading-7 text-[#F3F8FB]/88">
@@ -709,7 +752,7 @@ export function ShopContent() {
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -24 }}
-                  className="mx-auto flex min-h-[68vh] max-w-5xl flex-col justify-center"
+                  className="mx-auto flex min-h-[60vh] max-w-5xl flex-col justify-center sm:min-h-[68vh]"
                 >
                   <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
@@ -721,7 +764,7 @@ export function ShopContent() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 self-start md:self-auto">
                       <div className="h-1.5 w-40 overflow-hidden rounded-full bg-[#8CB9D8]/12">
                         <motion.div
                           className="h-full rounded-full bg-[#8CB9D8]"
@@ -732,6 +775,37 @@ export function ShopContent() {
                       <span className={`text-[11px] uppercase tracking-[0.36em] text-[#6F8DA7] ${monoFont}`}>
                         {currentIndex + 1}/{questProducts.length}
                       </span>
+                    </div>
+                  </div>
+
+                  <div className="mb-5 flex items-center justify-center">
+                    <div className="flex w-full flex-nowrap gap-2 overflow-x-auto rounded-full border border-[#8CB9D8]/16 bg-white/62 px-3 py-3 sm:w-auto sm:flex-wrap sm:justify-center">
+                      {getProductColors(currentProduct).map((color) => {
+                        const isActive = color.color === currentQuestColor
+
+                        return (
+                          <button
+                            key={color.color}
+                            onClick={() =>
+                              setQuestColors((previousColors) => ({
+                                ...previousColors,
+                                [currentProduct.id]: color.color,
+                              }))
+                            }
+                            className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm transition ${
+                              isActive
+                                ? 'border-[#8CB9D8] bg-[#E9F4FB] text-[#335A77]'
+                                : 'border-[#8CB9D8]/14 bg-white/72 text-[#5E7A93] hover:border-[#8CB9D8]/35'
+                            }`}
+                          >
+                            <span
+                              className="h-4 w-4 rounded-full border border-white/40"
+                              style={{ backgroundColor: color.colorHex }}
+                            />
+                            {color.color}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
 
@@ -751,13 +825,23 @@ export function ShopContent() {
                         scale: 0.92,
                       }}
                       transition={{ type: 'spring', stiffness: 220, damping: 24 }}
-                      className="mx-auto w-full max-w-[28rem] cursor-grab active:cursor-grabbing"
+                      className="mx-auto w-full max-w-[22.75rem] cursor-grab active:cursor-grabbing sm:max-w-[28rem]"
                     >
-                      <QuestCard product={currentProduct} dragOffset={dragOffset} />
+                      <QuestCard
+                        product={currentProduct}
+                        dragOffset={dragOffset}
+                        selectedColor={currentQuestColor}
+                        onColorChange={(color) =>
+                          setQuestColors((previousColors) => ({
+                            ...previousColors,
+                            [currentProduct.id]: color,
+                          }))
+                        }
+                      />
                     </motion.article>
                   </AnimatePresence>
 
-                  <div className="mt-8 flex items-center justify-center gap-4">
+                  <div className="mt-6 flex items-center justify-center gap-3 sm:mt-8 sm:gap-4">
                     <button
                       onClick={() => handleReaction('pass')}
                       className={`inline-flex min-h-14 min-w-14 items-center justify-center rounded-full border px-5 transition ${
@@ -791,7 +875,7 @@ export function ShopContent() {
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -24 }}
-                  className="grid gap-8 xl:grid-cols-[1.22fr_0.78fr]"
+                  className="grid gap-6 xl:grid-cols-[1.22fr_0.78fr] xl:gap-8"
                 >
                   <div className="space-y-4">
                     <div>
@@ -806,7 +890,7 @@ export function ShopContent() {
                       </p>
                     </div>
 
-                    <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="grid gap-4 md:grid-cols-2">
                       {resultCandidates.map((product) => {
                         const config = favoriteSelections[product.id]
                         if (!config) return null
@@ -816,6 +900,8 @@ export function ShopContent() {
                             key={product.id}
                             product={product}
                             config={config}
+                            sizeMode={sizeMode}
+                            globalSize={globalSize}
                             onToggle={() =>
                               updateFavoriteSelection(product.id, (current) => ({
                                 ...current,
@@ -850,7 +936,7 @@ export function ShopContent() {
                     </div>
                   </div>
 
-                  <aside className="rounded-[30px] border border-[#8CB9D8]/16 bg-white/72 p-6 shadow-[0_24px_80px_rgba(124,165,193,0.14)]">
+                  <aside className="rounded-[30px] border border-[#8CB9D8]/16 bg-white/72 p-5 shadow-[0_24px_80px_rgba(124,165,193,0.14)] sm:p-6 xl:sticky xl:top-24 xl:self-start">
                     <span className={`text-[11px] uppercase tracking-[0.38em] text-[#6B98B8] ${monoFont}`}>
                       Resumen
                     </span>
@@ -861,21 +947,53 @@ export function ShopContent() {
                       {activeResultProduct ? buildResultCopy(activeResultProduct, likedProducts.length) : 'Configura tus prendas favoritas y llévalas al carrito para terminar la compra.'}
                     </p>
 
+                    <div className="mt-8 flex gap-2 rounded-full border border-[#8CB9D8]/14 bg-white/70 p-2">
+                      {([
+                        { id: 'global', label: 'Talla global' },
+                        { id: 'individual', label: 'Por artículo' },
+                      ] as const).map((option) => {
+                        const isActive = sizeMode === option.id
+
+                        return (
+                          <button
+                            key={option.id}
+                            onClick={() => setSizeMode(option.id)}
+                            className={`min-h-11 flex-1 rounded-full px-4 text-[11px] uppercase tracking-[0.28em] transition ${
+                              isActive
+                                ? 'bg-[#8CB9D8] text-[#FCFAF5] shadow-[0_14px_30px_rgba(124,165,193,0.24)]'
+                                : 'text-[#5E7A93] hover:bg-[#E9F4FB]'
+                            } ${monoFont}`}
+                          >
+                            {option.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+
                     <div className="mt-8 rounded-[24px] border border-[#8CB9D8]/14 bg-[#E9F4FB]/68 p-4">
                       <span className={`text-[11px] uppercase tracking-[0.34em] text-[#6B98B8] ${monoFont}`}>
-                        Una talla para todas
+                        {sizeMode === 'global' ? 'Talla global activa' : 'Aplicar talla global'}
                       </span>
                       <div className="mt-4 grid grid-cols-4 gap-2">
                         {(['S', 'M', 'L', 'XL'] as Size[]).map((size) => (
                           <button
                             key={size}
                             onClick={() => applySizeToSelectedFavorites(size)}
-                            className="min-h-11 rounded-2xl border border-[#8CB9D8]/18 bg-white/70 text-sm text-[#335A77] transition hover:border-[#8CB9D8]/38"
+                            className={`min-h-11 rounded-2xl border text-sm transition ${
+                              globalSize === size
+                                ? 'border-[#8CB9D8] bg-[#8CB9D8] text-[#FCFAF5]'
+                                : 'border-[#8CB9D8]/18 bg-white/70 text-[#335A77] hover:border-[#8CB9D8]/38'
+                            }`}
                           >
                             {size}
                           </button>
                         ))}
                       </div>
+                      {sizeMode === 'global' && !hasGlobalSelectionCoverage ? (
+                        <p className="mt-3 text-sm leading-6 text-[#6B98B8]">
+                          Algunas prendas no tienen esa talla con el color elegido. Puedes ajustar por artículo.
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="mt-6 space-y-3 rounded-[24px] border border-[#8CB9D8]/14 bg-white/76 p-5">
@@ -964,9 +1082,9 @@ function CollectionsView({
             ) : null}
           </aside>
 
-          <div className="flex gap-5 overflow-x-auto pb-2 pr-1 snap-x snap-mandatory">
+          <div className="flex gap-4 overflow-x-auto pb-2 pr-1 snap-x snap-mandatory sm:gap-5">
             {section.products.map((product) => (
-              <div key={product.id} className="w-[18rem] flex-none snap-center sm:w-[19rem] lg:w-[20rem]">
+              <div key={product.id} className="w-[15.75rem] flex-none snap-center sm:w-[18rem] lg:w-[20rem]">
                 <CollectionsProductCard product={product} />
               </div>
             ))}
@@ -1014,7 +1132,17 @@ function IntroPreviewCard({ product }: { product: Product }) {
   )
 }
 
-function QuestCard({ product, dragOffset }: { product: Product; dragOffset: number }) {
+function QuestCard({
+  product,
+  dragOffset,
+  selectedColor,
+  onColorChange,
+}: {
+  product: Product
+  dragOffset: number
+  selectedColor: string
+  onColorChange: (color: string) => void
+}) {
   const colors = getProductColors(product).slice(0, 3)
   const likeOpacity = clamp(Math.max(dragOffset, 0) / 120, 0, 1)
   const passOpacity = clamp(Math.max(-dragOffset, 0) / 120, 0, 1)
@@ -1074,16 +1202,21 @@ function QuestCard({ product, dragOffset }: { product: Product; dragOffset: numb
 
             <div className="mt-5 flex flex-wrap gap-2">
               {colors.map((color) => (
-                <span
+                <button
                   key={color.color}
-                  className="inline-flex min-h-11 items-center gap-3 rounded-full border border-white/14 bg-white/10 px-4 py-2 text-sm text-[#F8FBFD]"
+                  onClick={() => onColorChange(color.color)}
+                  className={`inline-flex min-h-11 items-center gap-3 rounded-full border px-4 py-2 text-sm transition ${
+                    selectedColor === color.color
+                      ? 'border-white/40 bg-[#8CB9D8]/26 text-[#FCFAF5]'
+                      : 'border-white/14 bg-white/10 text-[#F8FBFD] hover:bg-white/16'
+                  }`}
                 >
                   <span
                     className="h-4 w-4 rounded-full border border-white/40"
                     style={{ backgroundColor: color.colorHex }}
                   />
                   {color.color}
-                </span>
+                </button>
               ))}
             </div>
           </div>
@@ -1180,6 +1313,8 @@ function CollectionsProductCard({ product }: { product: Product }) {
 function FavoriteSelectionCard({
   product,
   config,
+  sizeMode,
+  globalSize,
   onToggle,
   onColorChange,
   onSizeChange,
@@ -1187,6 +1322,8 @@ function FavoriteSelectionCard({
 }: {
   product: Product
   config: FavoriteSelectionConfig
+  sizeMode: SizeMode
+  globalSize: Size | null
   onToggle: () => void
   onColorChange: (color: string) => void
   onSizeChange: (size: Size) => void
@@ -1194,6 +1331,7 @@ function FavoriteSelectionCard({
 }) {
   const colors = getProductColors(product)
   const availableSizes = getAvailableSizes(product, config.color)
+  const displayedSize = sizeMode === 'global' && globalSize ? globalSize : config.size
 
   return (
     <div
@@ -1264,25 +1402,30 @@ function FavoriteSelectionCard({
 
         <div>
           <span className={`text-[11px] uppercase tracking-[0.34em] text-[#6B98B8] ${monoFont}`}>
-            Talla
+            {sizeMode === 'global' ? 'Talla global' : 'Talla'}
           </span>
+          {sizeMode === 'global' ? (
+            <p className="mt-2 text-sm text-[#5E7A93]">
+              Esta tarjeta usa la talla global que elijas en el resumen.
+            </p>
+          ) : null}
           <div className="mt-3 grid grid-cols-4 gap-2">
             {(['S', 'M', 'L', 'XL'] as Size[]).map((size) => {
               const isAvailable = availableSizes.includes(size)
-              const isActive = config.size === size
+              const isActive = displayedSize === size
 
               return (
                 <button
                   key={size}
                   onClick={() => isAvailable && onSizeChange(size)}
-                  disabled={!isAvailable}
+                  disabled={!isAvailable || sizeMode === 'global'}
                   className={`min-h-11 rounded-2xl border text-sm transition ${
                     isActive
                       ? 'border-[#8CB9D8] bg-[#8CB9D8] text-[#FCFAF5]'
                       : isAvailable
                         ? 'border-[#8CB9D8]/14 text-[#335A77] hover:border-[#8CB9D8]/35'
                         : 'border-[#8CB9D8]/8 bg-[#F7FBFE] text-[#A7BAC9]'
-                  }`}
+                  } ${sizeMode === 'global' ? 'cursor-default' : ''}`}
                 >
                   {size}
                 </button>

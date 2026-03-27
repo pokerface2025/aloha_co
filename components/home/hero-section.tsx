@@ -243,12 +243,12 @@ export function HeroSection() {
   }
 
   return (
-    <section className={`relative min-h-screen overflow-hidden bg-[#F6F0E6] px-4 pb-10 pt-24 text-[#335A77] sm:px-6 lg:px-8 ${bodyFont}`}>
+    <section className={`relative min-h-screen overflow-hidden bg-[#F6F0E6] px-4 pb-8 pt-20 text-[#335A77] sm:px-6 sm:pb-10 sm:pt-24 lg:px-8 ${bodyFont}`}>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(140,185,216,0.26),transparent_36%),radial-gradient(circle_at_bottom,rgba(227,210,182,0.18),transparent_34%)]" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(246,240,230,0.96),rgba(233,244,251,0.82)_42%,rgba(246,240,230,0.96))]" />
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-7rem)] max-w-7xl items-center">
-        <div className="w-full overflow-hidden rounded-[36px] border border-[#8CB9D8]/18 bg-[rgba(252,250,245,0.8)] p-5 shadow-[0_28px_120px_rgba(124,165,193,0.16)] backdrop-blur sm:p-8 lg:p-10">
+      <div className="relative mx-auto flex min-h-[calc(100vh-6rem)] max-w-7xl items-center sm:min-h-[calc(100vh-7rem)]">
+        <div className="w-full overflow-hidden rounded-[28px] border border-[#8CB9D8]/18 bg-[rgba(252,250,245,0.8)] p-4 shadow-[0_28px_120px_rgba(124,165,193,0.16)] backdrop-blur sm:rounded-[36px] sm:p-8 lg:p-10">
           <AnimatePresence mode="wait">
             {etapa === 'intro' ? (
               <motion.div
@@ -256,20 +256,20 @@ export function HeroSection() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="mx-auto flex min-h-[70vh] max-w-3xl flex-col items-center justify-center text-center"
+                className="mx-auto flex min-h-[58vh] max-w-3xl flex-col items-center justify-center py-6 text-center sm:min-h-[70vh]"
               >
                 <span className={`text-[11px] uppercase tracking-[0.4em] text-[#6B98B8] ${monoFont}`}>
                   Quiero Mi Aloha
                 </span>
-                <h1 className={`mt-6 text-[clamp(3.4rem,9vw,7rem)] leading-[0.88] text-[#335A77] ${headingFont}`}>
+                <h1 className={`mt-6 text-[clamp(2.8rem,14vw,7rem)] leading-[0.9] text-[#335A77] ${headingFont}`}>
                   Encuentra tu pieza perfecta.
                 </h1>
-                <p className="mt-6 max-w-2xl text-base leading-8 text-[#5E7A93] sm:text-lg">
+                <p className="mt-6 max-w-2xl text-sm leading-7 text-[#5E7A93] sm:text-lg sm:leading-8">
                   Empieza una experiencia simple: verás una prenda a la vez, decidirás con un corazón o una X y al final te mostraremos cuál es tu Aloha ideal.
                 </p>
                 <Button
                   onClick={iniciarExperiencia}
-                  className="mt-10 min-h-11 rounded-full border border-[#8CB9D8]/30 bg-[#8CB9D8] px-9 text-sm uppercase tracking-[0.28em] text-[#FCFAF5] hover:bg-[#7DAFCE]"
+                  className="mt-8 min-h-11 w-full rounded-full border border-[#8CB9D8]/30 bg-[#8CB9D8] px-9 text-sm uppercase tracking-[0.28em] text-[#FCFAF5] hover:bg-[#7DAFCE] sm:mt-10 sm:w-auto"
                 >
                   Empezar experiencia
                 </Button>
@@ -282,7 +282,7 @@ export function HeroSection() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="mx-auto flex min-h-[70vh] w-full max-w-3xl flex-col justify-center"
+                className="mx-auto flex min-h-[62vh] w-full max-w-3xl flex-col justify-center sm:min-h-[70vh]"
               >
                 <div className="mb-5 text-center">
                   <span className={`text-[11px] uppercase tracking-[0.36em] text-[#6B98B8] ${monoFont}`}>
@@ -312,10 +312,10 @@ export function HeroSection() {
                     }}
                     transition={{ type: 'spring', stiffness: 220, damping: 24 }}
                     style={{ x: springHoverX, rotate: springHoverRotate }}
-                    className="mx-auto w-full max-w-[26rem] cursor-grab active:cursor-grabbing sm:max-w-[27rem] md:max-w-[28rem]"
+                    className="mx-auto w-full max-w-[22.5rem] cursor-grab active:cursor-grabbing sm:max-w-[27rem] md:max-w-[28rem]"
                   >
                     <div className="overflow-hidden rounded-[32px] border border-[#8CB9D8]/16 bg-[rgba(252,250,245,0.9)] shadow-[0_26px_100px_rgba(124,165,193,0.18)]">
-                      <div className="relative h-[clamp(30rem,67vh,41rem)] overflow-hidden">
+                      <div className="relative h-[clamp(24rem,58vh,41rem)] overflow-hidden sm:h-[clamp(30rem,67vh,41rem)]">
                         <Image
                           src={productoActual.media[0]?.url || '/placeholder.jpg'}
                           alt={productoActual.name}
@@ -333,7 +333,7 @@ export function HeroSection() {
                           </div>
                         </div>
 
-                        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
+                        <div className="absolute inset-x-0 bottom-0 p-3 sm:p-5">
                           <div className="rounded-[26px] border border-white/18 bg-[linear-gradient(180deg,rgba(17,40,58,0.22),rgba(17,40,58,0.72))] p-4 text-[#FCFAF5] backdrop-blur-md sm:p-5">
                             <div className="flex items-start justify-between gap-3">
                               <span className={`text-[11px] uppercase tracking-[0.34em] text-[#D9ECF8] ${monoFont}`}>
@@ -358,14 +358,14 @@ export function HeroSection() {
                               </div>
                             </div>
 
-                            <p className="mt-4 text-sm leading-7 text-[#F5F8FB] sm:text-[15px]">
+                            <p className="mt-4 text-sm leading-6 text-[#F5F8FB] sm:text-[15px] sm:leading-7">
                               {productoActual.description}
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-center gap-4 p-4 sm:gap-5 sm:p-5">
+                      <div className="flex items-center justify-center gap-3 p-3 sm:gap-5 sm:p-5">
                           <button
                             onClick={() => reaccionar('pass')}
                             className={`inline-flex min-h-14 min-w-14 items-center justify-center rounded-full border px-7 text-[#335A77] transition sm:min-h-16 sm:min-w-16 ${
@@ -401,11 +401,11 @@ export function HeroSection() {
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -24 }}
-                className="grid gap-8 xl:grid-cols-[1.08fr_0.92fr]"
+                className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr] xl:gap-8"
               >
                 <div className="overflow-hidden rounded-[34px] border border-[#8CB9D8]/18 bg-[rgba(252,250,245,0.84)] shadow-[0_28px_110px_rgba(124,165,193,0.18)]">
                   <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr]">
-                    <div className="group relative min-h-[24rem] overflow-hidden bg-[#EAF6FC]">
+                    <div className="group relative min-h-[20rem] overflow-hidden bg-[#EAF6FC] sm:min-h-[24rem]">
                       <Image
                         src={piezaElegida.media[0]?.url || '/placeholder.jpg'}
                         alt={piezaElegida.name}
@@ -424,7 +424,7 @@ export function HeroSection() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-7 p-6 sm:p-8 lg:p-10">
+                    <div className="flex flex-col gap-6 p-5 sm:p-8 lg:p-10">
                       <div>
                         <span className={`text-[11px] uppercase tracking-[0.38em] text-[#6B98B8] ${monoFont}`}>
                           Resultado final
@@ -539,7 +539,7 @@ export function HeroSection() {
                   </div>
                 </div>
 
-                <aside className="rounded-[30px] border border-[#8CB9D8]/16 bg-white/72 p-6 shadow-[0_24px_80px_rgba(124,165,193,0.14)]">
+                  <aside className="rounded-[30px] border border-[#8CB9D8]/16 bg-white/72 p-5 shadow-[0_24px_80px_rgba(124,165,193,0.14)] sm:p-6">
                   <span className={`text-[11px] uppercase tracking-[0.38em] text-[#6B98B8] ${monoFont}`}>
                     Por qué quedó arriba
                   </span>

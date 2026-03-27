@@ -54,7 +54,7 @@ export function BestSellersSection() {
   }
 
   return (
-    <section className={`relative px-4 py-16 sm:px-6 lg:px-8 lg:py-24 ${bodyFont}`}>
+    <section className={`relative px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-24 ${bodyFont}`}>
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(233,244,251,0.62),rgba(246,240,230,0.84)_56%,rgba(246,240,230,1))]" />
 
       <div className="relative mx-auto max-w-7xl">
@@ -62,26 +62,23 @@ export function BestSellersSection() {
           initial={{ opacity: 0, y: 18 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.25 }}
-          className="rounded-[34px] border border-[#8CB9D8]/18 bg-[rgba(252,250,245,0.78)] p-6 shadow-[0_22px_90px_rgba(124,165,193,0.14)] backdrop-blur sm:p-8"
+          className="rounded-[30px] border border-[#8CB9D8]/18 bg-[rgba(252,250,245,0.78)] p-5 shadow-[0_22px_90px_rgba(124,165,193,0.14)] backdrop-blur sm:rounded-[34px] sm:p-8"
         >
           <div className="mx-auto max-w-4xl text-center">
             <span className={`text-[11px] uppercase tracking-[0.34em] text-[#6B98B8] ${monoFont}`}>
               Suscríbete
             </span>
-            <h2 className={`mt-4 text-4xl text-[#335A77] sm:text-5xl ${headingFont}`}>
+            <h2 className={`mt-4 text-3xl leading-tight text-[#335A77] sm:text-5xl ${headingFont}`}>
               10% de descuento en tu primera compra.
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-[#5E7A93]">
+            <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-[#5E7A93] sm:text-base sm:leading-8">
               Déjanos tu correo y te reservamos un código de bienvenida para entrar a ALOHA con una ventaja desde el primer pedido.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="mx-auto mt-8 max-w-4xl">
-            <div className="rounded-[28px] border border-[#8CB9D8]/14 bg-white/72 p-4 sm:p-5">
-              <div className="mb-4 flex justify-center">                
-              </div>
-
-              <div className="flex flex-col gap-3 lg:flex-row">
+          <form onSubmit={handleSubmit} className="mx-auto mt-8 max-w-5xl">
+            <div className="rounded-[24px] border border-[#8CB9D8]/14 bg-white/72 p-3.5 sm:rounded-[28px] sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <input
                   type="email"
                   value={email}
@@ -93,7 +90,7 @@ export function BestSellersSection() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="inline-flex min-h-14 items-center justify-center rounded-full border border-[#8CB9D8]/28 bg-[#8CB9D8] px-7 text-sm uppercase tracking-[0.28em] text-[#FCFAF5] transition hover:bg-[#7DAFCE] disabled:opacity-60"
+                  className="inline-flex min-h-14 w-full items-center justify-center rounded-full border border-[#8CB9D8]/28 bg-[#8CB9D8] px-7 text-sm uppercase tracking-[0.28em] text-[#FCFAF5] transition hover:bg-[#7DAFCE] disabled:opacity-60 sm:w-auto sm:min-w-[14rem]"
                 >
                   {isSubmitting ? 'Registrando...' : 'Suscribirme'}
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -101,7 +98,7 @@ export function BestSellersSection() {
               </div>
             </div>
 
-            <p className="mt-4 text-center text-sm leading-7 text-[#5E7A93]">
+            <p className="mt-4 px-2 text-center text-sm leading-7 text-[#5E7A93]">
               Te escribiremos con tu beneficio de bienvenida y futuras novedades de la marca.
             </p>
 
