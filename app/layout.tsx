@@ -21,7 +21,13 @@ const yeseva = Yeseva_One({
   weight: ['400'],
 })
 
+const metadataBase =
+  process.env.NEXT_PUBLIC_SITE_URL
+    ? new URL(process.env.NEXT_PUBLIC_SITE_URL)
+    : new URL('http://localhost:3000')
+
 export const metadata: Metadata = {
+  metadataBase,
   title: 'ALOHA | Camisetas Premium Costeñas',
   description: 'Camisetas premium con el mood de la costa colombiana. Calidad, estilo y la brisa del Caribe en cada prenda. Envíos a toda Colombia.',
   keywords: ['camisetas', 'premium', 'colombia', 'barranquilla', 'ropa', 'moda', 'costeño'],
@@ -43,7 +49,7 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
-    generator: 'v0.app'
+  generator: 'v0.app'
 }
 
 export const viewport: Viewport = {
