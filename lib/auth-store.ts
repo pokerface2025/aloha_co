@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export interface AuthUser {
   _id: string;
@@ -24,13 +24,23 @@ interface AuthState {
   setSession: (session: AuthSession) => void;
   clearSession: () => void;
   isExpired: () => boolean;
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       session: null,
-      setSession: (session) => set({ session }),
+      _hasHydrated: false,
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
+      setSession: (session: AuthSession) => {
+        set({ session });
+        // Verificar si el token está expirado después de setear
+        if (session && new Date(session.expireTokenAt).getTime() <= Date.now()) {
+          set({ session: null });
+        }
+      },
       clearSession: () => set({ session: null }),
       isExpired: () => {
         const session = get().session;
@@ -43,9 +53,13 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "aloha-auth",
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         session: state.session,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

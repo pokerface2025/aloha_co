@@ -31,7 +31,7 @@ export function LoginForm() {
         password,
       });
 
-      setSession(data as AuthSession);
+      setSession(data as unknown as AuthSession);
       router.push(redirectTo);
       router.refresh();
     } catch (submitError) {

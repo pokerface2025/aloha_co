@@ -7,6 +7,7 @@ import { LogOut, Package, RefreshCw, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/lib/auth-store";
+import { useAuthHydrated } from "@/hooks/use-auth-hydrated";
 import { formatPrice } from "@/lib/products";
 import { networkFetch } from "@/lib/network/networkManager";
 
@@ -86,6 +87,7 @@ const getStatusTone = (status: string) => {
 
 export function OrdersConsole() {
   const router = useRouter();
+  const hydrated = useAuthHydrated();
   const session = useAuthStore((state) => state.session);
   const clearSession = useAuthStore((state) => state.clearSession);
   const isExpired = useAuthStore((state) => state.isExpired);
@@ -95,12 +97,15 @@ export function OrdersConsole() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Validar sesión solo después de que el store se rehidrató
   useEffect(() => {
+    if (!hydrated) return;
+
     if (!session || isExpired()) {
       clearSession();
       router.replace("/login?redirect=/admin");
     }
-  }, [clearSession, isExpired, router, session]);
+  }, [hydrated, clearSession, isExpired, router, session]);
 
   const loadOrders = async () => {
     if (!session?.token) {
@@ -124,8 +129,9 @@ export function OrdersConsole() {
   };
 
   useEffect(() => {
+    if (!hydrated) return;
     void loadOrders();
-  }, [session?.token]);
+  }, [session?.token, hydrated]);
 
   const filteredOrders = useMemo(() => {
     const query = search.trim().toLowerCase();
