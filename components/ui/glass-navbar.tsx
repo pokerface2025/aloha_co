@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { motion, useMotionValueEvent, useScroll } from "framer-motion"
+import { useMotionValueEvent, useScroll } from "framer-motion"
 
 import { cn } from "@/lib/utils"
 
@@ -16,7 +16,7 @@ export function GlassNavbar({ className, ...props }: GlassNavbarProps) {
   })
 
   return (
-    <motion.header
+    <header
       className={cn(
         "glass-navbar sticky top-0 z-50 border border-transparent bg-transparent transition-all",
         isScrolled &&

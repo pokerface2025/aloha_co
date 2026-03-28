@@ -151,7 +151,6 @@
     font-family: var(--font-heading);
     font-weight: 400;
     letter-spacing: -0.01em;
-    text-transform: capitalize;
     line-height: 1.15;
   }
 
